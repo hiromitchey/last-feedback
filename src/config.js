@@ -55,7 +55,9 @@ export const CFG = {
   // ビーム：予告80fのあと、ボスの声が予告線の高さをまっすぐ速く飛んでくる
   laser: { warn: 80, fire: 150, width: 52, minGap: 80, textSpeed: 4, maxTextSize: 2.2 },
   // ボスの声（言葉のかたまり）。base は標準の文字の大きさ(px)、判定は文字の大きさ×hitRatio
-  phrase: { base: 24, speed: 1.9, amp: 42, wavelength: 360, hitRatio: 0.3, max: 3 },
+  phrase: { base: 24, speed: 1.9, amp: 42, wavelength: 360, hitRatio: 0.3, max: 3,
+    bigSpeed: 1.0, bigMul: 1.35,      // でっかい文字：ゆーっくり（{{}} 2.6 × 1.35 ≒ 84px）
+    fastSpeed: 3.2, fastMul: 0.8 },   // 小さい文字：速く（ピンクの上限 3.4 未満）
 
   boss: {
     // 体力は設計書の約2.2倍。強化2系統（W/P）の最大火力が設計書の G4 の約2倍になるため（PLAN.md）

@@ -200,15 +200,15 @@ function* road2a() {
 // ---- 面の構成（物語に合わせた3面。PLAN.md） ----
 // part: { road, min, cap } 道中 / { mid } 中ボス / { boss } 母船
 export const STAGES = [
-  { name: '1面', title: 'メイレイドオリ', planet: 0.8, parts: [
+  { name: 'STAGE 1', title: '', planet: 0.8, parts: [
     { road: road1a, min: 35 * 60, cap: 10 },
     { mid: 1 },
     { road: road1b, min: 15 * 60, cap: 10 },
   ] },
-  { name: '2面', title: 'カイシュウ', planet: 1.0, parts: [
+  { name: 'STAGE 2', title: '', planet: 1.0, parts: [
     { road: road2a, min: 40 * 60, cap: 16 },       // 中ボス2 は次の作業で
   ] },
-  { name: '3面', title: 'オウトウナシ', planet: 1.3, parts: [
+  { name: 'STAGE 3', title: '', planet: 1.3, parts: [
     { boss: true },                                 // 道中・中ボス3 は次の作業で
   ] },
 ];
@@ -245,7 +245,7 @@ function* stage(si, pi, bossForm, cores, withMission) {
     state.stage = si;
     state.planet = S.planet;
     if (pi === 0) {
-      popup(S.name + '　' + S.title, CFG.W / 2, CFG.H / 2 - 30, { big: true, size: 44, col: '#fff', life: 100 });
+      popup(S.name, CFG.W / 2, CFG.H / 2 - 30, { big: true, size: 44, col: '#fff', life: 100 });
       yield* sched.wait(60);
     }
     for (; pi < S.parts.length; pi++) yield* runPart(si, pi, S.parts[pi], bossForm, cores);
@@ -263,12 +263,13 @@ export function startStage(si = 0, pi = 0, bossForm = 1, cores = null, withMissi
 export function skipSegment() {
   if (state.boss) { skipForm(); return; }
   if (state.mid) { if (midTargetable()) damageMid(state.mid.hp + 1); return; }
-  if (!state.seg) return;
+  if (!state.seg || state.seg.skipping) return;   // 次の部分が始まるまでは受け付けない
   let si = state.seg.stage, pi = state.seg.part + 1;
   if (pi >= STAGES[si].parts.length) { si++; pi = 0; }
   if (si >= STAGES.length) return;
   for (const e of state.enemies) e.alive = false;
   for (const b of state.eBullets) b.alive = false;
   state.warnings.length = 0;
+  state.seg.skipping = true;
   startStage(si, pi);
 }

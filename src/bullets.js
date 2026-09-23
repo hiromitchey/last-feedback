@@ -95,6 +95,7 @@ export function phrase(src, text, opt = {}) {
   if (!opt.beam && state.phrases.filter(q => !q.beam).length >= (opt.max ?? F.max)) return null;
   const chars = parsePhrase(text, () => gameRng.rnd());
   // ビームの文字は帯からはみ出しすぎない大きさまで
+  if (opt.sizeMul) for (const c of chars) c.size *= opt.sizeMul;
   if (opt.maxSize) for (const c of chars) c.size = Math.min(c.size, opt.maxSize);
   // 横に並べる。文字幅は大きさに比例、言葉の間に少し隙間
   let x = 0, prevWord = 0;

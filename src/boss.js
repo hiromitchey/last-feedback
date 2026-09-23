@@ -78,6 +78,39 @@ function* voiceLoop(b, count, period, col, max) {
     yield* sched.wait(period - CFG.warn.shot);
   }
 }
+
+// でっかい文字がゆーっくり、ほぼまっすぐ。自機の高さに来るので上下によける
+function* bigLoop(b, period, max) {
+  yield* sched.wait(30);
+  const list = T.big[b.form];
+  let idx = 0;
+  while (true) {
+    yield* sched.charge(b);
+    const y = Math.max(90, Math.min(CFG.H - 90, state.player.y));
+    phrase(b, list[idx++ % list.length], { y, col: COL.VIOLET, speed: CFG.phrase.bigSpeed, amp: 8,
+      sizeMul: CFG.phrase.bigMul, max });
+    yield* sched.wait(period - CFG.warn.shot);
+  }
+}
+
+// 小さい文字が速く、何本か続けて。高さは自機の近くにばらし、間を空ける
+function* fastLoop(b, count, period, max) {
+  yield* sched.wait(90);
+  const list = T.fast[b.form];
+  let idx = 0;
+  while (true) {
+    yield* sched.charge(b, 20);
+    const base = state.player.y;
+    for (let i = 0; i < count; i++) {
+      const y = Math.max(40, Math.min(CFG.H - 40, base + (i - (count - 1) / 2) * 110 + gameRng.range(-20, 20)));
+      phrase(b, list[idx++ % list.length], { y, col: COL.PINK, speed: CFG.phrase.fastSpeed, amp: 0,
+        sizeMul: CFG.phrase.fastMul, max });
+      yield* sched.wait(12);
+    }
+    yield* sched.wait(period - 20 - count * 12);
+  }
+}
+
 function* laserLoop(b, count, period) {
   yield* sched.wait(60);
   while (true) {
@@ -114,14 +147,22 @@ function startForm(b) {
   b.body = { alive: true };
   const o = b.body;
   state.segCap = B().cap[b.form - 1];
-  if (b.form === 1) sched.add(voiceLoop(b, 1, 170, COL.VIOLET, 2), o);
+  // 声：でっかくゆっくり／小さく速く／波。形態が進むほど重なる
+  if (b.form === 1) {
+    sched.add(bigLoop(b, 260, 3), o);
+    sched.add(voiceLoop(b, 1, 200, COL.CYAN, 3), o);
+  }
   if (b.form === 2) {
-    sched.add(voiceLoop(b, 2, 170, COL.CYAN, 3), o);
+    sched.add(bigLoop(b, 240, 5), o);
+    sched.add(fastLoop(b, 2, 150, 5), o);
+    sched.add(voiceLoop(b, 1, 190, COL.CYAN, 5), o);
     sched.add(laserLoop(b, 1, 240), o);
     sched.add(orbLoop(b, 2, 300), o);
   }
   if (b.form === 3) {
-    sched.add(voiceLoop(b, 2, 150, COL.CYAN, 4), o);
+    sched.add(bigLoop(b, 220, 7), o);
+    sched.add(fastLoop(b, 3, 130, 7), o);
+    sched.add(voiceLoop(b, 2, 170, COL.CYAN, 7), o);
     sched.add(needleLoop(b, 60), o);
     sched.add(laserLoop(b, 2, 260), o);
     sched.add(orbLoop(b, 3, 280), o);
