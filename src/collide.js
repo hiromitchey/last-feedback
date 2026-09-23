@@ -128,7 +128,9 @@ export function collide() {
       if (q.w > 6 && Math.abs(p.y - q.y0) < q.w * 0.34 + CFG.player.r) { damagePlayer(); break; }
       continue;
     }
-    if (Math.abs(p.y - q.y0) > q.amp + 40) continue;
+    if (q.kind === 'slam') continue;                           // 叩きつけた文字には当たらない（崩れた弾が当たる）
+    if (q.kind !== 'col' && Math.abs(p.y - q.y0) > q.amp + 40) continue;
+    if (q.kind === 'col' && Math.abs(p.x - q.x0) > 60) continue;
     for (const c of q.chars) {
       if (c.space || c.sc < 0.5) continue;
       checks++;

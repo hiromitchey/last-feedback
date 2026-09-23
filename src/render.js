@@ -142,6 +142,14 @@ export function render(debug) {
     ctx.setLineDash([]);
   }
   ctx.globalAlpha = 1;
+  // 縦書きの言葉の予告：その列に縦の点線
+  for (const w of state.colWarns) {
+    ctx.globalAlpha = 0.35 + 0.35 * ((w.t >> 3) & 1);
+    ctx.strokeStyle = COL.CYAN; ctx.lineWidth = 2; ctx.setLineDash([14, 10]);
+    ctx.beginPath(); ctx.moveTo(w.x, 0); ctx.lineTo(w.x, CFG.H); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  ctx.globalAlpha = 1;
   // ボスの声・ビーム：言葉のかたまり。強調は大きく反転、言葉ごとに傾き、出てくるときに弾む
   for (const q of state.phrases) {
     if (q.beam) {
@@ -159,7 +167,8 @@ export function render(debug) {
   // 敵弾（でか玉以外）
   for (const b of state.eBullets) {
     if (b.hp) continue;
-    if (b.needle) blit(S.needleSprite(b.col), b.x, b.y, Math.atan2(b.vy, b.vx));
+    if (b.ch) blit(S.glyphSprite(b.ch, b.col, b.px), b.x, b.y, Math.sin(state.frame * 0.1 + b.x) * 0.2);
+    else if (b.needle) blit(S.needleSprite(b.col), b.x, b.y, Math.atan2(b.vy, b.vx));
     else blit(S.bulletSprite(b.col, 5.5), b.x, b.y);
   }
   // でか玉（弾の中で一番上）

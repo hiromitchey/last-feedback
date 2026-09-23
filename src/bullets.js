@@ -21,6 +21,7 @@ function push(x, y, ang, speed, col, opt = {}) {
     curve: opt.curve ?? 0, acc: opt.acc ?? 0,
     hp: opt.hp, maxhp: opt.hp, spin: 0, spinV: opt.spinV ?? 0,
     needle: !!opt.needle, id: 0, kind: opt.kind,
+    ch: opt.ch ?? null, px: opt.px ?? 0,   // 文字の弾（叩きつけた言葉が崩れたもの）
   };
   state.eBullets.push(b);
   return b;
@@ -58,7 +59,7 @@ export function fan(src, n, dir, spread, speed, col) {
 const LANE_GAP = 6;
 function occupiedBands() {
   const bands = [];
-  for (const q of state.phrases) if (q.alive) bands.push([q.y0 - q.half, q.y0 + q.half]);
+  for (const q of state.phrases) if (q.alive && q.kind !== 'col') bands.push([q.y0 - q.half, q.y0 + q.half]);
   const wh = CFG.laser.width / 2 + CFG.phrase.base * CFG.laser.maxTextSize / 2;
   for (const w of state.laserWarns) if (w.alive) bands.push([w.y - wh, w.y + wh]);
   return bands;
@@ -99,8 +100,10 @@ export function* laserWarn(src, count) {
     bands.push([y - half, y + half]);
   }
   src.pendingLaser = ys;
-  // 予告線はビームが出るまで残す（寿命で先に消えると、その1フレームに別の声が同じ高さへ入り込む）
-  const warns = ys.map(y => ({ y, t: CFG.laser.warn + 5, alive: true }));
+  // 予告線はビームが出るまで残す（寿命で先に消えると、そのすき間に別の声が入り込む）
+  // ボスが弱って待ちが延びる（weakenRate）ぶんも含めて残す
+  const waitFrames = Math.round(CFG.laser.warn * (state.boss ? state.boss.weakenRate : 1));
+  const warns = ys.map(y => ({ y, t: waitFrames + 5, alive: true }));
   state.laserWarns.push(...warns);
   yield* sched.wait(CFG.laser.warn);
   for (const w of warns) w.alive = false;
@@ -163,6 +166,8 @@ export function phrase(src, text, opt = {}) {
 
 // 各文字の位置・傾き・出てくるときの弾み（ポンと出る）
 function layoutPhrase(q) {
+  if (q.kind === 'slam') return layoutSlam(q);
+  if (q.kind === 'col') return layoutCol(q);
   for (let i = 0; i < q.chars.length; i++) {
     const c = q.chars[i];
     c.x = q.x + c.dx;
@@ -179,6 +184,13 @@ export function movePhrases() {
   const L = CFG.laser;
   for (const q of state.phrases) {
     q.t++;
+    if (q.kind === 'slam') { layoutSlam(q); if (q.t >= q.shatterAt) shatter(q); continue; }
+    if (q.kind === 'col') {
+      q.y += q.dir * q.v;
+      layoutCol(q);
+      if (q.dir > 0 ? q.y > CFG.H + 40 : q.y + q.height < -40) q.alive = false;
+      continue;
+    }
     q.x -= q.v;
     layoutPhrase(q);
     if (q.beam) {
@@ -193,6 +205,87 @@ export function movePhrases() {
 
 export function moveLasers() {
   for (const w of state.laserWarns) if (--w.t <= 0) w.alive = false;
+  for (const w of state.colWarns) if (--w.t <= 0) w.alive = false;
+}
+
+// ---- 叩きつけ：言葉が画面にドンと叩きつけられ、少し止まって読ませたあと、1文字ずつ崩れて弾になる ----
+// 叩きつけた文字そのものには当たらない（読ませるための予告）。崩れた文字の弾が攻撃
+export function slam(src, text, opt = {}) {
+  const F = CFG.phrase, S = CFG.slam;
+  const chars = parsePhrase(text, () => gameRng.rnd());
+  let x = 0, prevWord = 0;
+  for (const c of chars) {
+    c.size *= S.sizeMul;
+    const w = F.base * c.size * (c.space ? 0.5 : c.half ? 0.55 : 0.95);
+    if (c.word !== prevWord) { x += F.base * 0.3; prevWord = c.word; }
+    c.dx = x + w / 2; c.px = Math.round(F.base * c.size); c.r = 0;
+    c.tilt = (gameRng.rnd() - 0.5) * 0.2;
+    x += w;
+  }
+  const maxPx = Math.max(...chars.map(c => c.px));
+  const half = maxPx / 2 + 6;
+  const y0 = freeY(opt.y ?? CFG.H / 2, half);
+  if (y0 === null) return null;
+  const q = { kind: 'slam', chars, width: x, half, sx: opt.x ?? 480, y0, col: opt.col ?? COL.VIOLET,
+    t: 0, shatterAt: S.stamp + S.hold, alive: true };
+  layoutSlam(q);
+  state.phrases.push(q);
+  state.shake = Math.max(state.shake, 8);
+  return q;
+}
+function layoutSlam(q) {
+  const S = CFG.slam;
+  const u = Math.min(1, q.t / S.stamp), e = 1 - (1 - u) ** 3;
+  const sc = 2.4 - 1.4 * e;                                   // 大きく出て、縮んで止まる
+  if (q.t === S.stamp) state.shake = Math.max(state.shake, 10); // ドン
+  for (const c of q.chars) {
+    c.x = q.sx - q.width / 2 + c.dx; c.y = q.y0;
+    c.rot = c.tilt * (1 - e * 0.5);
+    c.sc = sc;
+  }
+}
+// 崩れる：1文字ずつ、その場から自機へ向かう文字の弾になる
+function shatter(q) {
+  q.alive = false;
+  const S = CFG.slam, p = state.player;
+  q.chars.forEach((c, i) => {
+    if (c.space) return;
+    const a = Math.atan2(p.y - c.y, p.x - c.x) + (i - (q.chars.length - 1) / 2) * S.spread;
+    push(c.x, c.y, a, S.speed, q.col, { ch: c.ch, px: Math.min(c.px, S.bulletPx), r: S.bulletR });
+  });
+}
+
+// ---- 縦書きの言葉：上から降ってくる／下から上がってくる。出る前に、その列に予告の点線 ----
+export function* column(src, text, opt = {}) {
+  const F = CFG.phrase, C = CFG.col;
+  const chars = parsePhrase(text, () => gameRng.rnd());
+  let y = 0;
+  for (const c of chars) {
+    const h = F.base * c.size * (c.space ? 0.5 : 1.0);
+    c.dy = y + h / 2; c.px = Math.round(F.base * c.size);
+    c.r = c.space ? 0 : F.base * c.size * F.hitRatio;
+    c.tilt = (gameRng.rnd() - 0.5) * 0.12;
+    y += h;
+  }
+  const dir = opt.dir ?? 1;
+  const x = opt.x;
+  const w = { x, t: C.warn, dir, alive: true };
+  state.colWarns.push(w);
+  yield* sched.wait(C.warn);
+  w.alive = false;
+  const q = { kind: 'col', chars, height: y, x0: x, dir, y: dir > 0 ? -y - 10 : CFG.H + 10,
+    v: (opt.speed ?? C.speed) * state.diff.speed, col: opt.col ?? COL.CYAN, t: 0, alive: true };
+  layoutCol(q);
+  state.phrases.push(q);
+}
+function layoutCol(q) {
+  for (let i = 0; i < q.chars.length; i++) {
+    const c = q.chars[i];
+    c.x = q.x0 + Math.sin(q.t * 0.06 + i * 0.5) * 3;
+    c.y = q.y + c.dy;
+    c.rot = c.tilt;
+    c.sc = 1;
+  }
 }
 
 // でか玉。hp・半径・遅い速度を必ずセットする（原則7）

@@ -35,7 +35,7 @@ function startGame() {
 // コンティニュー：回数制限なし。死んだ区間の頭から（ボス戦なら形態の頭から）。スコアはリセット
 function doContinue() {
   const cp = state.checkpoint || { stage: 0, part: 0, lv: { way: 0, pow: 0 } };
-  for (const a of [state.enemies, state.eBullets, state.pBullets, state.items, state.warnings, state.phrases, state.laserWarns]) a.length = 0;
+  for (const a of [state.enemies, state.eBullets, state.pBullets, state.items, state.warnings, state.phrases, state.laserWarns, state.colWarns]) a.length = 0;
   state.boss = null;
   state.mid = null;
   state.bossWarn = 0;
@@ -100,6 +100,7 @@ function stepPlay() {
   sweep(state.warnings);
   sweep(state.phrases);
   sweep(state.laserWarns);
+  sweep(state.colWarns);
   state.scroll += CFG.scroll * warpSpeed();
 }
 

@@ -19,6 +19,7 @@ export const state = {
   warnings: [],             // 出現予告の「▶」
   phrases: [],              // ボスの声（言葉のかたまり）とビーム
   laserWarns: [],           // レーザーの予告線
+  colWarns: [],             // 縦書きの言葉の予告線
   popups: [],
   booms: [],                // 爆発（見た目だけ）
   debris: [],               // 破片（見た目だけ）
@@ -53,6 +54,7 @@ export function resetWorld() {
   state.warnings.length = 0;
   state.phrases.length = 0;
   state.laserWarns.length = 0;
+  state.colWarns.length = 0;
   state.popups.length = 0;
   state.booms.length = 0;
   state.debris.length = 0;

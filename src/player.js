@@ -121,6 +121,7 @@ export function fireBomb(auto = false) {
   for (const b of state.eBullets) { if (b.hp && b.alive) breakOrb(b); else b.alive = false; }
   for (const q of state.phrases) q.alive = false;
   for (const w of state.laserWarns) w.alive = false;
+  for (const w of state.colWarns) w.alive = false;
   if (state.boss) state.boss.pendingLaser = null;
   for (const e of state.enemies) if (e.alive && e.x < CFG.W + 10) damageEnemy(e, BM.enemyDmg);
   bombBoss(BM.bossDmg);

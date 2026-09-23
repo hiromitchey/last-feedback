@@ -3,7 +3,7 @@
 import { CFG, COL } from './config.js';
 import { state, popup, flash, spawnParticle } from './world.js';
 import * as sched from './sched.js';
-import { needle, fan, bigOrb, laserWarn, hLaser, phrase } from './bullets.js';
+import { needle, fan, bigOrb, laserWarn, hLaser, phrase, slam, column } from './bullets.js';
 import { spawnItem } from './items.js';
 import { spawnEnemy } from './enemies.js';
 import { fxRng, gameRng } from './rng.js';
@@ -62,28 +62,62 @@ function* lowerCore(p) {
 }
 
 // ---- 本体の攻撃（形態ごと） ----
-// 声：言葉のかたまりを波に乗せて流す。1本目は自機の高さ、2本目以降は間を空けて上下どちらかに
-// （上下に逃げ道を残す。原則5）
-function* voiceLoop(b, count, period, col, max) {
+// 声は「進行役」が1つずつ順番に出す（横に流すだけだと動画のコメントに見えるので、見せ方を混ぜる）
+//   slam 叩きつけ → 崩れて弾 / fallN 縦書きがN本降る / riseN 下から上がる / flow 波打って流れる / fast 速い小さい文字
+const VOICE_SEQ = {
+  1: ['slam', 'flow', 'slam', 'fall1'],
+  2: ['slam', 'fall1', 'fast', 'slam', 'rise1', 'flow'],
+  3: ['slam', 'fall2', 'fast', 'slam', 'rise2', 'flow', 'slam', 'fall3'],
+};
+const nonBeam = () => state.phrases.filter(q => !q.beam);
+const colsBusy = () => state.colWarns.length > 0 || state.phrases.some(q => q.kind === 'col');
+const beamBusy = () => state.laserWarns.length > 0 || state.phrases.some(q => q.beam);
+
+function* voiceDirector(b) {
   yield* sched.wait(60);
-  const list = T.voice[b.form];
-  let idx = 0;
-  while (true) {
+  const seq = VOICE_SEQ[b.form];
+  const idx = { slam: 0, col: 0, flow: 0, fast: 0 };
+  const pick = (list, k) => list[idx[k]++ % list.length];
+  for (let i = 0; ; i++) {
+    const p = seq[i % seq.length];
+    const vertical = p.startsWith('fall') || p.startsWith('rise');
+    // 縦の言葉と横の言葉は同時に出さない（重ねない）
+    if (vertical) {
+      yield* sched.waitUntil(() => nonBeam().length === 0 && !beamBusy() && !colsBusy());
+      b.vertPending = true;                 // 縦書きを出すと決めた。ビームはこれが消えるまで待つ
+    } else yield* sched.waitUntil(() => !colsBusy() && nonBeam().length <= 1);
     yield* sched.charge(b);
-    const py = state.player.y;
-    const ys = [py];
-    for (let i = 1; i < count; i++) {
-      const up = py > CFG.H / 2 ? -1 : 1;
-      ys.push(py + up * (150 + i * 40) * (gameRng.rnd() < 0.2 ? -1 : 1));
-    }
-    ys.forEach((y, i) => {
-      const yc = Math.max(60, Math.min(CFG.H - 60, y));
-      const text = list[idx % list.length];
-      phrase(b, text, { y: yc, col, ph: gameRng.rnd() * 6, max });
+    if (p === 'slam') {
+      const text = pick(T.slam[b.form], 'slam');
+      const y = state.player.y > CFG.H / 2 ? 150 : CFG.H - 150;   // 自機のいない側に叩きつける
+      slam(b, text, { x: 470, y, col: COL.VIOLET });
       order(b, text);
-      idx++;
-    });
-    yield* sched.wait(period - CFG.warn.shot);
+      yield* sched.wait(CFG.slam.stamp + CFG.slam.hold + 40);
+    } else if (vertical) {
+      const n = +p.slice(4), dir = p.startsWith('fall') ? 1 : -1;
+      const px = Math.max(100, Math.min(620, state.player.x));
+      const xs = [px];
+      for (let k = 1; k < n; k++) xs.push(Math.max(80, Math.min(700, px + (k % 2 ? 190 : -190) * Math.ceil(k / 2))));
+      for (const x of xs) {
+        sched.add(column(b, pick(T.col[b.form], 'col'), { x, dir }), b.body);
+        yield* sched.wait(14);
+      }
+      yield* sched.wait(80);
+      b.vertPending = false;                // 縦書きが出きってから外す（ここから先は colsBusy() が見張る）
+    } else if (p === 'flow') {
+      const text = pick(T.voice[b.form], 'flow');
+      phrase(b, text, { y: state.player.y, col: COL.CYAN, ph: gameRng.rnd() * 6, max: 8 });
+      order(b, text);
+      yield* sched.wait(90);
+    } else if (p === 'fast') {
+      for (let k = 0; k < 2; k++) {
+        const y = Math.max(40, Math.min(CFG.H - 40, state.player.y + (k ? 110 : -110)));
+        phrase(b, pick(T.fast[b.form], 'fast'), { y, col: COL.PINK, speed: CFG.phrase.fastSpeed, amp: 0,
+          sizeMul: CFG.phrase.fastMul, max: 8 });
+        yield* sched.wait(12);
+      }
+      yield* sched.wait(60);
+    }
   }
 }
 
@@ -103,46 +137,11 @@ function* minions(b) {
   }
 }
 
-// でっかい文字がゆーっくり、ほぼまっすぐ。自機の高さに来るので上下によける
-function* bigLoop(b, period, max) {
-  yield* sched.wait(30);
-  const list = T.big[b.form];
-  let idx = 0;
-  while (true) {
-    yield* sched.charge(b);
-    const y = Math.max(90, Math.min(CFG.H - 90, state.player.y));
-    const text = list[idx++ % list.length];
-    order(b, text);
-    phrase(b, text, { y, col: COL.VIOLET, speed: CFG.phrase.bigSpeed, amp: 8,
-      sizeMul: CFG.phrase.bigMul, max });
-    yield* sched.wait(period - CFG.warn.shot);
-  }
-}
-
-// 小さい文字が速く、何本か続けて。高さは自機の近くにばらし、間を空ける
-function* fastLoop(b, count, period, max) {
-  yield* sched.wait(90);
-  const list = T.fast[b.form];
-  let idx = 0;
-  while (true) {
-    yield* sched.charge(b, 20);
-    const base = state.player.y;
-    for (let i = 0; i < count; i++) {
-      const y = Math.max(40, Math.min(CFG.H - 40, base + (i - (count - 1) / 2) * 110 + gameRng.range(-20, 20)));
-      const text = list[idx++ % list.length];
-      if (i === 0) order(b, text);
-      phrase(b, text, { y, col: COL.PINK, speed: CFG.phrase.fastSpeed, amp: 0,
-        sizeMul: CFG.phrase.fastMul, max });
-      yield* sched.wait(12);
-    }
-    yield* sched.wait(period - 20 - count * 12);
-  }
-}
-
 function* laserLoop(b, count, period) {
   yield* sched.wait(60);
   while (true) {
     const c = count === 2 && b.weakenRate >= 1.6 ? 1 : count;   // 45秒続いたら1本に
+    yield* sched.waitUntil(() => !colsBusy() && !b.vertPending);   // 縦書きの言葉とは重ねない
     yield* laserWarn(b, c);
     // ボムで予告線が消されたら、そのビームは撃たない（予告なしのビームを出さない。原則3）
     if (!b.pendingLaser || !b.pendingLaser.length) { b.pendingLaser = null; yield* sched.wait(period - CFG.laser.warn); continue; }
@@ -175,22 +174,13 @@ function startForm(b) {
   b.body = { alive: true };
   const o = b.body;
   state.segCap = B().cap[b.form - 1];
-  // 声：でっかくゆっくり／小さく速く／波。形態が進むほど重なる
-  if (b.form === 1) {
-    sched.add(bigLoop(b, 260, 3), o);
-    sched.add(voiceLoop(b, 1, 200, COL.CYAN, 3), o);
-  }
+  // 声は進行役が1つずつ（叩きつけ・降る・上がる・流れる）
+  sched.add(voiceDirector(b), o);
   if (b.form === 2) {
-    sched.add(bigLoop(b, 240, 5), o);
-    sched.add(fastLoop(b, 2, 150, 5), o);
-    sched.add(voiceLoop(b, 1, 190, COL.CYAN, 5), o);
     sched.add(laserLoop(b, 1, 240), o);
     sched.add(orbLoop(b, 2, 300), o);
   }
   if (b.form === 3) {
-    sched.add(bigLoop(b, 220, 7), o);
-    sched.add(fastLoop(b, 3, 130, 7), o);
-    sched.add(voiceLoop(b, 2, 170, COL.CYAN, 7), o);
     sched.add(needleLoop(b, 60), o);
     sched.add(laserLoop(b, 2, 260), o);
     sched.add(orbLoop(b, 3, 280), o);
@@ -292,6 +282,7 @@ function clearDanger() {
   for (const e of state.enemies) if (e.type === 'chibi') e.alive = false;
   for (const q of state.phrases) q.alive = false;
   for (const w of state.laserWarns) w.alive = false;
+  for (const w of state.colWarns) w.alive = false;
   if (state.boss) state.boss.pendingLaser = null;
 }
 

@@ -58,6 +58,10 @@ export const CFG = {
 
   // ビーム：予告80fのあと、ボスの声が予告線の高さをまっすぐ速く飛んでくる
   laser: { warn: 80, fire: 150, width: 52, minGap: 80, textSpeed: 4, maxTextSize: 2.2 },
+  // 叩きつけ：stamp で大きく出て止まる → hold だけ読ませる → 崩れて文字の弾（紫＝遅い）
+  slam: { stamp: 12, hold: 42, sizeMul: 2.2, spread: 0.12, speed: 2.0, bulletPx: 30, bulletR: 8 },
+  // 縦書き：予告の点線 warn のあと、上から降る／下から上がる（水色＝遅い）
+  col: { warn: 36, speed: 1.9 },
   // ボスの声（言葉のかたまり）。base は標準の文字の大きさ(px)、判定は文字の大きさ×hitRatio
   phrase: { base: 24, speed: 1.9, amp: 42, wavelength: 360, hitRatio: 0.3, max: 3,
     bigSpeed: 1.0, bigMul: 1.35,      // でっかい文字：ゆーっくり（{{}} 2.6 × 1.35 ≒ 84px）
