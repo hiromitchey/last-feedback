@@ -57,7 +57,7 @@ export const CFG = {
   // ボスの声（言葉のかたまり）。base は標準の文字の大きさ(px)、判定は文字の大きさ×hitRatio
   phrase: { base: 24, speed: 1.9, amp: 42, wavelength: 360, hitRatio: 0.3, max: 3,
     bigSpeed: 1.0, bigMul: 1.35,      // でっかい文字：ゆーっくり（{{}} 2.6 × 1.35 ≒ 84px）
-    fastSpeed: 3.2, fastMul: 0.8 },   // 小さい文字：速く（ピンクの上限 3.4 未満）
+    fastSpeed: 7.0, fastMul: 0.8 },   // 小さい文字：高速。原則2（ピンク上限3.4）の例外。発射予告あり（PLAN.md）
 
   boss: {
     // 体力は設計書の約2.2倍。強化2系統（W/P）の最大火力が設計書の G4 の約2倍になるため（PLAN.md）
