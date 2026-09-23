@@ -13,7 +13,7 @@ import { moveEnemies } from './enemies.js';
 import { moveItems } from './items.js';
 import { moveWarnings, startStage } from './formation.js';
 import { collide } from './collide.js';
-import { initRender, render, onPlanet, ZOOM_FRAMES, RUINS_RECEIVE } from './render.js';
+import { initRender, render, onPlanet, ZOOM_FRAMES, RUINS_LINE_AT } from './render.js';
 import { prebuild } from './sprites.js';
 import { dbg, handleKey, tickFps, drawDebug } from './debug.js';
 import { sim } from './autoplay.js';
@@ -176,8 +176,9 @@ function step() {
         // 信号が1つ届く → 「オウトウ・・・セヨ・・・」が流れる → 暗くなって終わり
         const R = state.ruins;
         R.t++;
-        if (R.t === RUINS_RECEIVE + 40) showLine([STORY.finalCall], { y: CFG.H - 40, size: 20, now: true, type: 9 });
-        if (R.t > RUINS_RECEIVE + 40 && !state.logLine && !R.fade) R.fade = 1;
+        // 受信 → アンテナがほわほわ脈打つ余韻 → ゆっくり「オウトウ・・・セヨ・・・」
+        if (R.t === RUINS_LINE_AT) showLine([STORY.finalCall], { y: CFG.H - 40, size: 20, now: true, type: CFG.finalCallType });
+        if (R.t > RUINS_LINE_AT && !state.logLine && !R.fade) R.fade = 1;
         if (R.fade && ++R.fade > 150) toTitle();
         else if (R.t > 90 && input.tapped) toTitle();
       } else if (state.zoom) {

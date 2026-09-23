@@ -153,7 +153,7 @@ export function* afterBoss(b) {
   showLine([STORY.final], { y: CFG.H / 2 + 150, size: 24, now: true });
   yield* sched.waitUntil(() => !state.logLine);
   yield* sched.wait(60);
-  showLine([STORY.finalCall], { y: CFG.H / 2 + 150, size: 20, now: true, type: 9 });   // ゆっくり、途切れ途切れ
+  showLine([STORY.finalCall], { y: CFG.H / 2 + 150, size: 20, now: true, type: CFG.finalCallType });   // ゆっくり、途切れ途切れ
   yield* sched.waitUntil(() => !state.logLine || lineProgress(state.logLine).done);
   yield* sched.wait(40);
   // 言い終えてから、最後の力で発信する：小さな灯がひとつ点滅して点く → 信号が惑星へ → 届いて、それきり

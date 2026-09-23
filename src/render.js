@@ -727,6 +727,9 @@ function drawEnding() {
 const RUINS_WAIT = 300;                           // しばらくは、ただの廃墟（約5秒）
 const RUINS_TRAVEL = 240;                         // そのあと、ふよふよ降りてくる（約4秒）
 export const RUINS_RECEIVE = RUINS_WAIT + RUINS_TRAVEL;   // 信号がアンテナに届くフレーム
+const RUINS_PULSES = [0, 80, 160];                        // 受信のあと、ほわ…ほわ…ほわ…（脈打つ間隔）
+const RUINS_PULSE_LEN = 100;
+export const RUINS_LINE_AT = RUINS_RECEIVE + 160 + RUINS_PULSE_LEN + 40;   // 余韻が終わってから文字
 function drawRuins() {
   cv.style.cursor = 'default';
   const t = state.ruins.t, L = S.DISH_LIGHT;
@@ -744,17 +747,21 @@ function drawRuins() {
     ctx.beginPath(); ctx.arc(x, y, 6 + (k % 20), 0, 7); ctx.stroke();
     ctx.fillStyle = '#e8fbff'; ctx.beginPath(); ctx.arc(x, y, 2.5, 0, 7); ctx.fill();
   } else if (t >= RUINS_RECEIVE) flashT = t - RUINS_RECEIVE;
-  // アンテナの灯：いつもはゆっくり点滅、信号が届いた直後だけ明るい
+  // アンテナの灯：いつもはかすかに点滅。受信したら、ほわ…ほわ…ほわ…と3回ゆっくり脈打つ
   const base = 0.3 + 0.5 * Math.max(0, Math.sin(t * 0.06));
-  const flash = flashT < 30 ? 1 - flashT / 30 : 0;
-  ctx.globalAlpha = Math.min(1, base * 0.5 + flash * 0.6); ctx.fillStyle = '#9fe8ff';
-  ctx.beginPath(); ctx.arc(L.x, L.y, 7 + flash * 10, 0, 7); ctx.fill();
-  ctx.globalAlpha = Math.min(1, base + flash); ctx.fillStyle = '#fff';
-  ctx.beginPath(); ctx.arc(L.x, L.y, 2.5, 0, 7); ctx.fill();
-  if (flash > 0) {
-    ctx.globalAlpha = flash * 0.5; ctx.strokeStyle = '#9fe8ff'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(L.x, L.y, 12 + (1 - flash) * 50, 0, 7); ctx.stroke();
+  let glow = 0;
+  for (const p of RUINS_PULSES) {
+    const k = flashT - p;
+    if (k < 0 || k >= RUINS_PULSE_LEN) continue;
+    const u = k / RUINS_PULSE_LEN;
+    glow = Math.max(glow, Math.sin(Math.PI * u));             // ふわっと明るくなって、ふわっと戻る
+    ctx.globalAlpha = (1 - u) * 0.45; ctx.strokeStyle = '#9fe8ff'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(L.x, L.y, 10 + u * 70, 0, 7); ctx.stroke();   // 柔らかい光の輪
   }
+  ctx.globalAlpha = Math.min(1, base * 0.5 + glow * 0.5); ctx.fillStyle = '#9fe8ff';
+  ctx.beginPath(); ctx.arc(L.x, L.y, 7 + glow * 12, 0, 7); ctx.fill();
+  ctx.globalAlpha = Math.min(1, base + glow); ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(L.x, L.y, 2.5 + glow, 0, 7); ctx.fill();
   ctx.globalAlpha = 1;
   // 受け取った呼びかけ（「オウトウ・・・セヨ・・・」）
   drawStoryText();
