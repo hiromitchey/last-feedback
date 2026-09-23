@@ -716,21 +716,26 @@ function drawEnding() {
 }
 
 // ---- 廃墟の街。受信アンテナの灯だけが点滅している。空から信号が1つ降りてきて、届く ----
-export const RUINS_RECEIVE = 120;                 // 信号がアンテナに届くフレーム
+const RUINS_WAIT = 300;                           // しばらくは、ただの廃墟（約5秒）
+const RUINS_TRAVEL = 240;                         // そのあと、ふよふよ降りてくる（約4秒）
+export const RUINS_RECEIVE = RUINS_WAIT + RUINS_TRAVEL;   // 信号がアンテナに届くフレーム
 function drawRuins() {
   cv.style.cursor = 'default';
   const t = state.ruins.t, L = S.DISH_LIGHT;
   ctx.drawImage(S.ruinsSprite(), 0, 0, CFG.W, CFG.H);
   // 空から降りてくる信号（母船の最後の呼びかけ）。1回きり
-  const k = t;
   let flashT = 999;
-  if (k < RUINS_RECEIVE) {
-    const u = k / RUINS_RECEIVE, sx = 900, sy = -20;
-    const x = sx + (L.x - sx) * u, y = sy + (L.y - sy) * u;
+  if (t >= RUINS_WAIT && t < RUINS_RECEIVE) {
+    const k = t - RUINS_WAIT, u = k / RUINS_TRAVEL, sx = 900, sy = -20;
+    const e = u * u * (3 - 2 * u);
+    // ふよふよ：左右と上下に、ゆっくり揺れながら（着く直前は揺れを収める）
+    const sway = 1 - e;
+    const x = sx + (L.x - sx) * e + Math.sin(k * 0.05) * 26 * sway;
+    const y = sy + (L.y - sy) * e + Math.sin(k * 0.083) * 12 * sway;
     ctx.globalAlpha = 0.6; ctx.strokeStyle = '#9fe8ff'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(x, y, 6 + (k % 20), 0, 7); ctx.stroke();
     ctx.fillStyle = '#e8fbff'; ctx.beginPath(); ctx.arc(x, y, 2.5, 0, 7); ctx.fill();
-  } else flashT = k - RUINS_RECEIVE;
+  } else if (t >= RUINS_RECEIVE) flashT = t - RUINS_RECEIVE;
   // アンテナの灯：いつもはゆっくり点滅、信号が届いた直後だけ明るい
   const base = 0.3 + 0.5 * Math.max(0, Math.sin(t * 0.06));
   const flash = flashT < 30 ? 1 - flashT / 30 : 0;
