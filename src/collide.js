@@ -3,7 +3,7 @@ import { CFG } from './config.js';
 import { state, spawnParticle, popup } from './world.js';
 import { damageEnemy } from './enemies.js';
 import { bossTargetable, damagePart, damageBoss } from './boss.js';
-import { midTargetable, damageMid } from './midboss.js';
+import { midTargetable, damageMid, damageMidPart } from './midboss.js';
 import { damagePlayer, gainLevel } from './player.js';
 import { scatter } from './items.js';
 import { onOrbBroken } from './story.js';
@@ -79,6 +79,12 @@ function hitBoss(b) {
 
 function hitMid(b) {
   if (!midTargetable()) return false;
+  // 部品が先（前に付いているので、部品に当たった弾はそこで止まる）
+  for (const p of state.mid.parts) {
+    if (p.dead) continue;
+    checks++;
+    if (hit(b, p, PB_R, p.r) && consume(b, p)) { damageMidPart(p, b.dmg); if (!b.alive) return true; }
+  }
   checks++;
   if (hit(b, state.mid, PB_R, state.mid.r) && consume(b, state.mid)) { damageMid(b.dmg); return !b.alive; }
   return false;

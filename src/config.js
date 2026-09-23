@@ -70,7 +70,8 @@ export const CFG = {
   },
 
   // 中ボス（面ごと）。倒すと母船の記録が出る
-  midboss: { hp: [900, 1300, 1800], r: 44, x: 730, score: 10000 },
+  midboss: { hp: [900, 1300, 1800], r: 44, x: 730, score: 10000,
+    partR: 24, partHp: 220, partScore: 1000, repairWait: 240 },   // 修理機の部品（壊しても付け直される）
 
   bomb: { max: 6, invincible: 120, enemyDmg: 30, bossDmg: 80 },
   autoBomb: true,             // 被弾の瞬間、ボムが残っていれば自動で発動して打ち消す（既定ON）

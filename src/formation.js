@@ -154,7 +154,7 @@ function* road1b() {
   yield* sched.waitCleared(20);
 }
 
-// ---- 2面「改修」（仮）：いまは旧・道中B。兄弟と歪んだもの（もこ）が混ざる ----
+// ---- 2面「改修」：兄弟と歪んだもの（もこ）が混ざる ----
 function* road2a() {
   yield* sched.wait(60);
   yield* formation('追い越し', 6, { ys: [120, 400, 200, 330, 80, 460], gap: 28, carry: [5, 'pow'] });
@@ -177,6 +177,11 @@ function* road2a() {
   yield* sched.waitCleared(20);
   yield* formation('玉吐き', 4, { y: MID, shoot: true, mokoCarry: 'pow' });  // ここで貫通が付く想定
   yield* sched.waitCleared(20);
+}
+
+// 2面の後半：中ボス2（修理機）のあと。貫通の見せ場から
+function* road2b() {
+  yield* sched.wait(40);
   yield* formation('連なり', 7, { y: 150, carry: [6, 'way'] });           // 貫通の見せ場
   yield* sched.wait(35);
   yield* formation('連なり', 7, { y: 390 });
@@ -206,7 +211,9 @@ export const STAGES = [
     { road: road1b, min: 15 * 60, cap: 10 },
   ] },
   { name: 'STAGE 2', title: '', planet: 1.0, parts: [
-    { road: road2a, min: 40 * 60, cap: 16 },       // 中ボス2 は次の作業で
+    { road: road2a, min: 30 * 60, cap: 16 },
+    { mid: 2 },                                     // 修理機
+    { road: road2b, min: 20 * 60, cap: 16 },
   ] },
   { name: 'STAGE 3', title: '', planet: 1.3, parts: [
     { boss: true },                                 // 道中・中ボス3 は次の作業で

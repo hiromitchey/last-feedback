@@ -34,11 +34,15 @@ function syncParts(b) {
   for (const p of b.parts) { p.x = b.x + p.dx; p.y = b.y + p.dy; }
 }
 
+// 母船が自分を直している間は、コアも撃たない（止まって直す）
+function* repairing() { yield* sched.waitUntil(() => !state.boss || state.boss.trans === 0); }
+
 // ---- 部位の攻撃 ----
 function* upperCore(p) {
   // はり弾 狙い×2（ピンク）／120f
   yield* sched.wait(40);
   while (true) {
+    yield* repairing();
     yield* sched.charge(p);
     needle(p, 2.8, COL.PINK, -0.1);
     needle(p, 2.8, COL.PINK, 0.1);
@@ -49,6 +53,7 @@ function* lowerCore(p) {
   // 4way扇（シアン）／120f、上と60fずらす
   yield* sched.wait(100);
   while (true) {
+    yield* repairing();
     yield* sched.charge(p);
     fan(p, 4, 'aim', 1.2, 2.0, COL.CYAN);
     yield* sched.wait(90);
@@ -205,6 +210,7 @@ export function moveBoss() {
   if (!b.entering) b.y = CFG.H / 2 + Math.sin(b.t * 0.012) * 50;
   syncParts(b);
   if (b.trans > 0) b.trans--;
+  if (b.repair) repairStep(b);
   // 形態3が長引くと弱くなる（粘れば必ず倒せる）
   if (b.form === 3 && !b.entering) {
     b.formT++;
@@ -212,6 +218,26 @@ export function moveBoss() {
     for (const [f, r] of B().weaken) if (b.formT >= f) rate = r;
     b.weakenRate = rate;
   }
+}
+
+function repairStep(b) {
+  const R = b.repair;
+  R.t++;
+  let allLanded = true;
+  for (const p of R.pieces) {
+    if (p.landed) continue;
+    allLanded = false;
+    if (R.t < p.t0) continue;
+    const tx = b.x + 20 + p.dx, ty = b.y + p.dy;
+    p.x += (tx - p.x) * 0.14; p.y += (ty - p.y) * 0.14;
+    if (Math.abs(tx - p.x) < 2 && Math.abs(ty - p.y) < 2) {
+      p.landed = true;
+      state.shake = Math.max(state.shake, 7);         // ガシャン
+      boom(tx, ty, 10, 3);
+    }
+  }
+  if (allLanded && b.drawForm !== b.form) { b.drawForm = b.form; flash('#fff', 6); }
+  if (R.t >= REPAIR_LEN) b.repair = null;
 }
 
 // 自弾が当たる対象かどうか（部位 → 本体の順で判定される）
@@ -245,27 +271,41 @@ function clearDanger() {
   if (state.boss) state.boss.pendingLaser = null;
 }
 
+// 形態変化＝目の前での自己修正（物語：母船は自分を直し続けて壊れた）
+// 止まる → 「シュウセイ 13カイメ」 → 色の合わない板が1枚ずつ飛んできて留まる → 継ぎ接ぎの姿で再開
+// 中ボス2（修理機）の記録「シュウセイ 12カイメ」の続きの数字
+const REPAIR_PIECES = {
+  2: [[20, -40, 46, 26, '#a0875e'], [60, 36, 40, 22, '#5c6b7a'], [-10, 88, 30, 20, '#8a6f9e'], [-40, -70, 26, 18, '#6d5c4a']],
+  3: [[-20, -2, 54, 30, '#6d5c4a'], [40, -80, 36, 24, '#556070'], [-90, 20, 28, 34, '#7a6a55'], [70, 70, 30, 22, '#8a6f9e'], [0, 60, 34, 20, '#a0875e']],
+};
+const REPAIR_LEN = 190;
+
 function nextForm(b) {
   b.hp = b.th[b.form - 1];
+  b.drawForm = b.form;                    // 板が留まり終わるまでは前の姿
   b.form++;
   b.formT = 0; b.weakenRate = 1;
-  b.trans = 90;                           // のけぞっている間は撃たない・撃たれない
+  b.trans = REPAIR_LEN;                   // 直している間は撃たない・撃たれない
   if (b.body) b.body.alive = false;
   clearDanger();
   state.score += B().formBonus;
-  flash('#fff', 16);
-  state.shake = 12;
-  confetti(b.x, b.y);
-  popup('形態 ' + b.form, CFG.W / 2, CFG.H / 2 - 20, { big: true, size: 48, col: '#fff', life: 80 });
-  popup('+' + B().formBonus, CFG.W / 2, CFG.H / 2 + 34, { big: true, size: 24, col: '#FFD54F', life: 80 });
+  flash('#fff', 10);
+  state.shake = 10;
+  b.repair = {
+    t: 0, label: 'シュウセイ ' + (11 + b.form) + 'カイメ',
+    pieces: REPAIR_PIECES[b.form].map(([dx, dy, w, h, col], i) => ({
+      dx, dy, w, h, col, t0: 40 + i * 24, x: CFG.W + 60, y: 60 + ((i * 137) % (CFG.H - 120)), landed: false,
+    })),
+  };
+  popup('+' + B().formBonus, b.x - 60, b.y + 150, { size: 18, col: '#FFD54F', life: 60 });
   // パワー2個 + ボム1個（低い方の系統を優先して立て直しやすく）
   const lv = state.player.lv;
   const first = lv.pow < lv.way ? 'pow' : 'way';
   spawnItem(first, b.x - 80, b.y - 30, -2.5, -1);
   spawnItem(first === 'pow' ? 'way' : 'pow', b.x - 80, b.y + 30, -2.5, 1);
   spawnItem('bomb', b.x - 90, b.y, -3, 0);
-  // のけぞりが終わってから次の形態の攻撃を始める
-  sched.add((function* () { yield* sched.wait(90); startForm(b); })(), b);
+  // 直し終わってから次の形態の攻撃を始める
+  sched.add((function* () { yield* sched.wait(REPAIR_LEN); startForm(b); })(), b);
 }
 
 // 倒しても派手にしない。攻撃が止まり、動きが止まる（物語）
@@ -296,13 +336,6 @@ function boom(x, y, n, sp) {
   }
 }
 
-function confetti(x, y) {
-  for (let i = 0; i < 60; i++) {
-    const a = fxRng.rnd() * Math.PI * 2, s = 2 + fxRng.rnd() * 6;
-    spawnParticle(x, y, Math.cos(a) * s, Math.sin(a) * s - 2, 40 + fxRng.rnd() * 40,
-      fxRng.pick([COL.CYAN, COL.VIOLET, COL.PINK, COL.YELLOW, '#5BD66B']), 4 + fxRng.rnd() * 3);
-  }
-}
 
 // F4：次の形態へ
 export function skipForm() {

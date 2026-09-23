@@ -290,6 +290,7 @@ export function midSprite(kind) {
   const k = 'mid|' + kind;
   let c = cache.get(k);
   if (c) return c;
+  if (kind === 2) { c = repairUnitSprite(); cache.set(k, c); return c; }
   const size = 130;
   c = mk(size, size, g => {
     const m = size / 2;
@@ -309,6 +310,40 @@ export function midSprite(kind) {
   });
   cache.set(k, c);
   return c;
+}
+
+// 2：修理機（継ぎ接ぎの塊）。いびつな塊に、色の合わない板がいくつも貼られている
+function repairUnitSprite() {
+  const size = 150, m = size / 2, R = size * 0.38;
+  return mk(size, size, g => {
+    const rs = [1, 0.9, 1.06, 0.84, 1.0, 1.1, 0.86, 0.96, 1.04, 0.88, 0.95, 1.02];
+    g.beginPath();
+    rs.forEach((r, i) => {
+      const a = i / rs.length * Math.PI * 2, x = m + Math.cos(a) * R * r, y = m + Math.sin(a) * R * r * 0.95;
+      i ? g.lineTo(x, y) : g.moveTo(x, y);
+    });
+    g.closePath();
+    g.lineJoin = 'round'; g.strokeStyle = '#fff'; g.lineWidth = 8; g.stroke();
+    g.fillStyle = '#9a90a8'; g.fill();
+    const plate = (x, y, w, h, col, rot) => {
+      g.save(); g.translate(m + x, m + y); g.rotate(rot);
+      g.fillStyle = col; g.fillRect(-w / 2, -h / 2, w, h);
+      g.fillStyle = '#e6e0ff';
+      for (const [px, py] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { g.beginPath(); g.arc(px * (w / 2 - 4), py * (h / 2 - 4), 2, 0, 7); g.fill(); }
+      g.restore();
+    };
+    plate(10, -30, 40, 24, '#a0875e', 0.15);
+    plate(28, 18, 34, 26, '#5c6b7a', -0.2);
+    plate(-8, 34, 30, 18, '#7a5aa8', 0.35);
+    plate(-24, -8, 26, 30, '#6d5c4a', -0.1);
+    plate(40, -8, 22, 30, '#8a6f9e', 0.25);
+    // 工具の腕（後ろ）
+    g.strokeStyle = '#cfd3dc'; g.lineWidth = 5; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(m + R * 0.8, m - R * 0.3); g.lineTo(m + R * 1.15, m - R * 0.75); g.lineTo(m + R * 1.3, m - R * 0.55); g.stroke();
+    // 片目のレンズ（左向き）
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(m - R * 0.5, m - R * 0.05, R * 0.24, 0, 7); g.fill();
+    g.fillStyle = '#FFD54F'; g.beginPath(); g.arc(m - R * 0.56, m - R * 0.05, R * 0.12, 0, 7); g.fill();
+  });
 }
 
 // コア（部位）：白フチ + 原色 + 中心の光。HPでヒビ
@@ -410,7 +445,7 @@ export function prebuild() {
   for (const k of ['way', 'pow', 'kakera', 'bomb']) itemSprite(k);
   mokoSprite(); byunSprite();
   for (let f = 1; f <= 3; f++) bossSprite(f);
-  midSprite(1);
+  midSprite(1); midSprite(2);
   for (const w of ['upper', 'lower']) for (let cr = 0; cr < 4; cr++) coreSprite(w, cr);
   watchFont();
   return cache.size;

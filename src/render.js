@@ -5,6 +5,7 @@ import { input, touchButtons } from './input.js';
 import * as S from './sprites.js';
 import { fxRng } from './rng.js';
 import { lineProgress, LIGHTS } from './story.js';
+import { PART_COLORS } from './midboss.js';
 import { RETRO_FONT, STORY } from './text.js';
 
 // ボスの灯の位置（ボスの絵の中心からのずれ）
@@ -199,8 +200,26 @@ function drawMid() {
   if (m.hitFlash) ctx.globalAlpha *= 0.75;
   const jx = m.dying ? (fxRng.rnd() - 0.5) * 6 : 0;
   blit(S.midSprite(m.kind), m.x + jx, m.y);
+  // 部品（修理機）。付け直すたびに色が変わる
+  for (const p of m.parts) {
+    if (!p.dead) drawPlate(p.x + jx, p.y, PART_COLORS[p.col], p.hp / p.maxhp, p.hitFlash);
+    if (p.fly) drawPlate(p.fly.x, p.fly.y, PART_COLORS[(p.col + 1) % PART_COLORS.length], 1, 0);
+    if (!p.dead && p.glow > 0) drawCharge(p);
+  }
   ctx.globalAlpha = 1;
   if (m.glow > 0) drawCharge({ x: m.x - 20, y: m.y, r: 36, glow: m.glow });
+}
+
+// 部品の板：白フチ＋色＋ボルト＋砲口。HPでヒビ
+function drawPlate(x, y, col, ratio, flashT) {
+  const w = 48, h = 38;
+  ctx.fillStyle = '#fff'; ctx.fillRect(x - w / 2 - 3, y - h / 2 - 3, w + 6, h + 6);
+  ctx.fillStyle = flashT ? '#fff' : col; ctx.fillRect(x - w / 2, y - h / 2, w, h);
+  ctx.fillStyle = '#2a2140'; ctx.fillRect(x - w / 2 - 14, y - 5, 16, 10);     // 砲口（左向き）
+  ctx.fillStyle = '#e6e0ff';
+  for (const [px, py] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { ctx.beginPath(); ctx.arc(x + px * (w / 2 - 6), y + py * (h / 2 - 6), 2.5, 0, 7); ctx.fill(); }
+  if (ratio < 0.6) { ctx.strokeStyle = '#2a2140'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 10, y - 12); ctx.lineTo(x + 2, y); ctx.lineTo(x - 4, y + 12); ctx.stroke(); }
+  if (ratio < 0.3) { ctx.beginPath(); ctx.moveTo(x + 8, y - 14); ctx.lineTo(x + 14, y + 4); ctx.stroke(); }
 }
 
 function drawBoss() {
@@ -210,9 +229,9 @@ function drawBoss() {
   // 撃破後：灯が消えるほど暗くなる
   const lit = b.lights ?? LIGHTS;
   if (b.dying) ctx.globalAlpha = 0.4 + 0.6 * lit / LIGHTS;
-  const jit = b.trans > 0 ? Math.sin(b.trans * 0.8) * 6 : 0;   // のけぞり
+  const jit = 0;
   if (b.hitFlash) ctx.globalAlpha *= 0.75;
-  blit(S.bossSprite(b.form), b.x + jit + 20, b.y);
+  blit(S.bossSprite(b.drawForm ?? b.form), b.x + jit + 20, b.y);
   ctx.globalAlpha = 1;
   // 灯（窓・スラスター・腕の先）。撃破後、ひとつずつ消える
   BOSS_LIGHTS.forEach(([dx, dy, col], i) => {
@@ -232,7 +251,22 @@ function drawBoss() {
     if (p.glow > 0) drawCharge(p);
   }
   if (b.glow > 0) drawCharge({ x: b.x - 40, y: b.y, r: 40, glow: b.glow });
+  // 自己修正：飛んでくる板と「シュウセイ nカイメ」
+  const R = b.repair;
+  if (R) {
+    for (const p of R.pieces) {
+      if (R.t < p.t0 || p.landed) continue;
+      ctx.fillStyle = '#fff'; ctx.fillRect(p.x - p.w / 2 - 2, p.y - p.h / 2 - 2, p.w + 4, p.h + 4);
+      ctx.fillStyle = p.col; ctx.fillRect(p.x - p.w / 2, p.y - p.h / 2, p.w, p.h);
+    }
+    const n = Math.min([...R.label].length, Math.floor(R.t / 4));
+    const a = R.t > REPAIR_TEXT_END ? Math.max(0, 1 - (R.t - REPAIR_TEXT_END) / 20) : 1;
+    ctx.globalAlpha = a;
+    text([...R.label].slice(0, n).join(''), b.x - 30, b.y - 150, 26, '#FFD54F', 'center', 'rgba(20,16,36,.9)');
+    ctx.globalAlpha = 1;
+  }
 }
+const REPAIR_TEXT_END = 170;
 
 function drawCharge(e) {
   // 発射予告：発射元が光る＋「!」
