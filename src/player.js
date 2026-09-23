@@ -41,7 +41,7 @@ export function shoot() {
   const p = state.player;
   if (p.shotCd > 0) { p.shotCd--; }
   // 既定は手動（押している間だけ）。オートショットは設定の逃げ道（技術設計書 6章）
-  const want = state.autoShot || held(BTN.SHOT);
+  const want = !state.quiet && (state.autoShot || held(BTN.SHOT));   // 撃破後は黙る
   const EN = CFG.energy;
   if (EN.enabled) {
     // 切れたら lock フレームのあいだ撃てない。その間にゲージが満タンまで戻る
@@ -152,7 +152,6 @@ export function damagePlayer() {
   p.stock.way = 0; p.stock.pow = 0;
   // 前（右）へ散らす。左へ流れて戻ってくるので無敵中に拾える
   scatter(kind, CFG.scatterOnHit, p.x + 20, p.y, 2.0, 4.5, 0);
-  popup('ドカーン！', p.x, p.y - 30, { col: '#FF5C8A', size: 28, life: 50 });
   // 残機が尽きたら CONTINUE?（回数制限なし。物語を最後まで見せる）
   if (p.lives < 0) { p.lives = 0; state.mode = 'continue'; state.contT = CFG.continueCount * 60; }
 }

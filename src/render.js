@@ -4,6 +4,15 @@ import { state, particles } from './world.js';
 import { input, touchButtons } from './input.js';
 import * as S from './sprites.js';
 import { fxRng } from './rng.js';
+import { beamX } from './bullets.js';
+import { lineProgress, LIGHTS } from './story.js';
+import { RETRO_FONT, STORY } from './text.js';
+
+// ボスの灯の位置（ボスの絵の中心からのずれ）
+const BOSS_LIGHTS = [
+  [-55, -14, '#4FC3F7'], [-100, 0, '#FFD54F'], [-30, -106, '#FF5C8A'],
+  [-30, 106, '#4FC3F7'], [122, -34, '#FF9E3D'], [122, 34, '#FF9E3D'],
+];
 
 export let cv, ctx;
 const FONT = '"Hiragino Maru Gothic ProN","BIZ UDPGothic","Meiryo",sans-serif';
@@ -68,8 +77,8 @@ function blit(img, x, y, rot = 0, scale = 1) {
   ctx.restore();
 }
 
-function text(str, x, y, size, col, align = 'center', outline = '#2a2140') {
-  ctx.font = `bold ${size}px ${FONT}`;
+function text(str, x, y, size, col, align = 'center', outline = '#2a2140', font = null) {
+  ctx.font = font ? `${size}px ${font}` : `bold ${size}px ${FONT}`;
   ctx.textAlign = align; ctx.textBaseline = 'middle';
   ctx.lineJoin = 'round';
   ctx.lineWidth = Math.max(3, size * 0.22); ctx.strokeStyle = outline;
@@ -85,6 +94,7 @@ export function render(debug) {
   drawBackground();
 
   if (state.mode === 'title') { drawTitle(); drawTouchUI(); return; }
+  if (state.mode === 'ending') { drawEnding(); return; }
 
   // アイテム
   for (const it of state.items) {
@@ -104,6 +114,8 @@ export function render(debug) {
   for (const e of state.enemies) {
     if (e.hitFlash) ctx.globalAlpha = 0.6;
     blit(spr[e.type], e.x, e.y, e.type === 'byun' ? e.ang - Math.PI : 0);
+    // 船体番号（047 の前後。047 だけは無い）
+    if (e.num) text(e.num, e.x + 2, e.y + e.r * 0.55, 10, '#fff', 'center', 'rgba(42,33,64,.8)', RETRO_FONT);
     ctx.globalAlpha = 1;
     // アイテムを持っている個体には目印（倒すと落とす）
     if (e.carry) blit(S.itemSprite(e.carry), e.x + e.r * 0.6, e.y - e.r - 8, 0, 0.62);
@@ -118,16 +130,19 @@ export function render(debug) {
     ctx.setLineDash([]);
   }
   ctx.globalAlpha = 1;
+  // 文字のビーム：横一直線に飛んでくる文字列
   for (const l of state.lasers) {
-    if (l.w <= 0) continue;
-    ctx.fillStyle = '#fff'; ctx.fillRect(0, l.y - l.w / 2 - 3, CFG.W, l.w + 6);
-    ctx.fillStyle = COL.YELLOW; ctx.fillRect(0, l.y - l.w / 2, CFG.W, l.w);
-    ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.fillRect(0, l.y - l.w * 0.12, CFG.W, l.w * 0.24);
+    for (let i = 0; i < l.chars.length; i++) {
+      const x = beamX(l, i), ch = l.chars[i];
+      if (x < -20 || x > CFG.W + 20 || ch === '　' || ch === ' ') continue;
+      blit(S.glyphSprite(ch, COL.YELLOW), x, l.y);
+    }
   }
   // 敵弾（でか玉以外）
   for (const b of state.eBullets) {
     if (b.hp) continue;
-    if (b.needle) blit(S.needleSprite(b.col), b.x, b.y, Math.atan2(b.vy, b.vx));
+    if (b.ch) blit(S.glyphSprite(b.ch, b.col), b.x, b.y);
+    else if (b.needle) blit(S.needleSprite(b.col), b.x, b.y, Math.atan2(b.vy, b.vx));
     else blit(S.bulletSprite(b.col, 5.5), b.x, b.y);
   }
   // でか玉（弾の中で一番上）
@@ -149,6 +164,7 @@ export function render(debug) {
     text('◀', CFG.W - 22, w.y, 26, '#FFD54F');
   }
   drawPopups();
+  drawStoryText();
   drawHUD();
   drawTouchUI();
 
@@ -167,21 +183,28 @@ export function render(debug) {
     const n = Math.max(0, Math.ceil(state.contT / 60) - 1);
     overlay('CONTINUE?', n + '　　クリック / タップ / Z でつづける');
   }
-  if (state.mode === 'clear') {
-    const r = state.bossResult;
-    overlay('CLEAR（仮）', 'SCORE ' + Math.floor(state.score) + (r ? '　撃破 ' + r.sec.toFixed(1) + '秒' : '') + '　クリック / タップでタイトルへ');
-  }
 }
 
 function drawBoss() {
   const b = state.boss;
   if (!b) return;
   // 撃破中は灯が消えていくように暗くする
-  if (b.dying) ctx.globalAlpha = Math.max(0.25, 1 - b.dying / 240);
+  // 撃破後：灯が消えるほど暗くなる
+  const lit = b.lights ?? LIGHTS;
+  if (b.dying) ctx.globalAlpha = 0.4 + 0.6 * lit / LIGHTS;
   const jit = b.trans > 0 ? Math.sin(b.trans * 0.8) * 6 : 0;   // のけぞり
   if (b.hitFlash) ctx.globalAlpha *= 0.75;
   blit(S.bossSprite(b.form), b.x + jit + 20, b.y);
   ctx.globalAlpha = 1;
+  // 灯（窓・スラスター・腕の先）。撃破後、ひとつずつ消える
+  BOSS_LIGHTS.forEach(([dx, dy, col], i) => {
+    if (i >= lit) return;
+    const x = b.x + jit + 20 + dx, y = b.y + dy;
+    ctx.globalAlpha = 0.35 + 0.15 * Math.sin(state.frame * 0.1 + i);
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, 9, 0, 7); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, 3.5, 0, 7); ctx.fill();
+  });
   // 部位（本体の手前。狙える対象は見えていなければならない）
   for (const p of b.parts) {
     if (p.dead) continue;
@@ -342,7 +365,7 @@ function drawHitboxes() {
   circle(state.player.x, state.player.y, CFG.player.r, '#0ff');
   const b = state.boss;
   if (b) { circle(b.x, b.y, b.r, '#f0f'); for (const p of b.parts) if (!p.dead) circle(p.x, p.y, p.r, '#f0f'); }
-  for (const l of state.lasers) { ctx.strokeStyle = '#ff0'; ctx.strokeRect(0, l.y - l.w * 0.34, CFG.W, l.w * 0.68); }
+  for (const l of state.lasers) for (let i = 0; i < l.chars.length; i++) circle(beamX(l, i), l.y, CFG.laser.r, '#ff0');
   ctx.strokeStyle = 'rgba(255,255,255,.3)';
   ctx.beginPath(); ctx.moveTo(CFG.player.xMax, 0); ctx.lineTo(CFG.player.xMax, CFG.H); ctx.stroke();
 }
@@ -352,4 +375,67 @@ export function drawStats(lines) {
   ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(8, 44, 330, lines.length * 15 + 8);
   ctx.fillStyle = '#9f9';
   lines.forEach((l, i) => ctx.fillText(l, 14, 48 + i * 15));
+}
+
+// ---- 物語の文字（レトロなフォント。戦いの邪魔をしない） ----
+function drawStoryText() {
+  const L = state.logLine;
+  if (L) {
+    const pr = lineProgress(L);
+    ctx.globalAlpha = pr.alpha;
+    text(pr.text, CFG.W / 2, L.y, L.size, '#fff', 'center', 'rgba(20,16,36,.9)', RETRO_FONT);
+    ctx.globalAlpha = 1;
+  }
+  const M = state.mission;
+  if (M) {
+    // MISSION / イジョウヲ ハイジョセヨ（タイプライター）
+    const a = Math.min(1, (200 - M.t) / 30);
+    ctx.globalAlpha = Math.max(0, a);
+    const [h, body] = STORY.mission;
+    const n = Math.max(0, Math.floor((M.t - 30) / 5));
+    text(h.slice(0, Math.min(h.length, Math.floor(M.t / 4))), CFG.W / 2, CFG.H / 2 - 24, 22, '#FFD54F', 'center', 'rgba(20,16,36,.9)', RETRO_FONT);
+    text([...body].slice(0, n).join(''), CFG.W / 2, CFG.H / 2 + 16, 30, '#fff', 'center', 'rgba(20,16,36,.9)', RETRO_FONT);
+    ctx.globalAlpha = 1;
+  }
+  if (state.blackout) {
+    ctx.globalAlpha = Math.min(1, state.blackout.t / 90);
+    ctx.fillStyle = '#000'; ctx.fillRect(-20, -20, CFG.W + 40, CFG.H + 40);
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ---- 最後の一枚。止まった母船、残骸、灯りのない惑星。一台だけ、まだ動いている ----
+function drawEnding() {
+  const t = state.endT;
+  ctx.fillStyle = '#07080f'; ctx.fillRect(0, 0, CFG.W, CFG.H);
+  // 星（動かない）
+  for (const L of layers) {
+    ctx.fillStyle = `rgba(200,210,255,${L.a * 0.7})`;
+    for (const p of L.pts) if (p.x < CFG.W) ctx.fillRect(p.x, p.y, p.s, p.s);
+  }
+  // 灯りのない惑星（大きく）
+  ctx.fillStyle = '#1b2438'; ctx.beginPath(); ctx.arc(760, 150, 190, 0, 7); ctx.fill();
+  ctx.fillStyle = '#222d45'; ctx.beginPath(); ctx.arc(710, 120, 150, 0, 7); ctx.fill();
+  ctx.fillStyle = '#07080f'; ctx.beginPath(); ctx.arc(840, 200, 160, 0, 7); ctx.fill();
+  // 止まった母船。継ぎ接ぎだらけ
+  ctx.globalAlpha = 0.55;
+  blit(S.bossSprite(3), 640, 330, -0.12, 1.05);
+  ctx.globalAlpha = 1;
+  // 残骸：動かない船。番号が読める
+  const wrecks = [[470, 110, 0.5], [860, 440, 2.4], [330, 470, -0.8], [560, 500, 1.2]];
+  const puni = S.puniSprite();
+  STORY.wrecks.forEach((num, i) => {
+    const [x, y, r] = wrecks[i];
+    ctx.globalAlpha = 0.5;
+    blit(puni, x, y, r);
+    ctx.globalAlpha = 0.8;
+    text(num, x, y + 16, 11, '#cfd6ff', 'center', 'rgba(7,8,15,.9)', RETRO_FONT);
+    ctx.globalAlpha = 1;
+  });
+  // 自機。船体に 047
+  const py = 280 + Math.sin(t * 0.03) * 6;
+  blit(S.playerSprite(state.player.lv.way), 250, py);
+  text('047', 244, py + 15, 12, '#2a2140', 'center', 'rgba(255,255,255,.9)', RETRO_FONT);
+  // フェードイン
+  if (t < 120) { ctx.globalAlpha = 1 - t / 120; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, CFG.W, CFG.H); ctx.globalAlpha = 1; }
 }

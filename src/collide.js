@@ -5,6 +5,8 @@ import { damageEnemy } from './enemies.js';
 import { bossTargetable, damagePart, damageBoss } from './boss.js';
 import { damagePlayer, gainLevel } from './player.js';
 import { scatter } from './items.js';
+import { beamX } from './bullets.js';
+import { onOrbBroken } from './story.js';
 import { fxRng } from './rng.js';
 
 const hit = (a, b, ra, rb) => {
@@ -43,6 +45,7 @@ function hitOrbs(b) {
 
 export function breakOrb(o) {
   o.alive = false;
+  onOrbBroken(o);                       // 断片が1行出る
   state.score += CFG.score.orb;
   scatter('kakera', o.boss ? CFG.orb.kakeraBoss : CFG.orb.kakera, o.x, o.y, 1.6, 3.2);
   // ボスのでか玉は強化アイテムも1個。低い方の系統を落として立て直しやすくする
@@ -53,7 +56,6 @@ export function breakOrb(o) {
       `hsl(${(fxRng.rnd() * 360) | 0},90%,70%)`, 3 + fxRng.rnd() * 4);
   }
   state.shake = Math.max(state.shake, 4);
-  popup('パキーン！', o.x, o.y - 16, { size: 28, col: '#FFD54F', life: 45 });
 }
 
 // 部位 → 本体。部位が生きていれば、部位に当たった弾はそこで吸われる
@@ -105,9 +107,15 @@ export function collide() {
     if (hit(b, p, b.r, CFG.player.r)) { damagePlayer(); break; }
   }
 
-  // 2b. 水平レーザー → 自機（横断する帯なので高さの差だけ見る）
-  for (const l of state.lasers) {
-    if (l.w > 4 && Math.abs(p.y - l.y) < l.w * 0.34 + CFG.player.r) { damagePlayer(); break; }
+  // 2b. 文字のビーム → 自機。高さが近いときだけ1文字ずつ見る
+  const LR = CFG.laser.r + CFG.player.r;
+  beams: for (const l of state.lasers) {
+    if (Math.abs(p.y - l.y) >= LR) continue;
+    for (let i = 0; i < l.chars.length; i++) {
+      if (l.chars[i] === '　' || l.chars[i] === ' ') continue;   // 空白は当たらない
+      checks++;
+      if (hit({ x: beamX(l, i), y: l.y }, p, CFG.laser.r, CFG.player.r)) { damagePlayer(); break beams; }
+    }
   }
 
   // 3. 敵本体 → 自機（道中の主脅威）

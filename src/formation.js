@@ -5,6 +5,7 @@ import * as sched from './sched.js';
 import { spawnEnemy } from './enemies.js';
 import { bigOrb } from './bullets.js';
 import { bossFight, skipForm } from './boss.js';
+import { mission } from './story.js';
 
 function warn(ys) {
   for (const y of ys) state.warnings.push({ y, t: CFG.warn.spawn, alive: true });
@@ -80,7 +81,7 @@ export function* formation(kind, n, opt = {}) {
       const my = opt.y ?? MID;
       warn([my]);
       yield* sched.wait(CFG.warn.spawn);
-      spawnEnemy('moko', X0 + 20, my, { orb: true, carry: opt.mokoCarry ?? null });
+      spawnEnemy('moko', X0 + 20, my, { orb: true, frag: opt.frag, carry: opt.mokoCarry ?? null });
       yield* sched.wait(70);
       const ys = n >= 4 ? [my - 150, my + 150, my - 100, my + 100] : [my - 140, my + 140];
       warn(ys.slice(0, n));
@@ -105,7 +106,7 @@ export function* formation(kind, n, opt = {}) {
       for (let i = 0; i < ys.length; i++) {
         warn([ys[i]]);
         yield* sched.wait(CFG.warn.spawn);
-        bigOrb(X0, ys[i], { slow: opt.slow });
+        bigOrb(X0, ys[i], { slow: opt.slow, frag: opt.frags?.[i] });
         if (i < ys.length - 1) yield* sched.wait(opt.gap ?? 50);
       }
       break;
@@ -124,7 +125,7 @@ function* segmentA() {
   yield* sched.wait(50);
   yield* formation('連なり', 4, { y: MID });
   yield* sched.waitCleared(20);
-  yield* formation('玉', 1, { ys: [MID - 40], slow: true });               // 初対面：何もない所に1個だけ
+  yield* formation('玉', 1, { ys: [MID - 40], slow: true, frags: ['A0'] }); // 初対面：何もない所に1個だけ
   yield* sched.wait(150);
   yield* formation('連なり', 5, { y: 380 });
   yield* sched.wait(45);
@@ -138,7 +139,7 @@ function* segmentA() {
   yield* sched.wait(60);
   yield* formation('階段', 5, { y0: 450, dy: -85 });
   yield* sched.waitCleared(20);
-  yield* formation('玉', 2, { ys: [140, 400], gap: 70 });                // 高さ違いの2個
+  yield* formation('玉', 2, { ys: [140, 400], gap: 70, frags: ['A1', 'A2'] });   // 高さ違いの2個
   yield* sched.wait(60);
   yield* formation('連なり', 5, { y: MID });
   yield* sched.wait(40);
@@ -148,7 +149,7 @@ function* segmentA() {
   yield* sched.wait(50);
   yield* formation('波', 6, { y0: 340, amp: 90, phase: Math.PI });
   yield* sched.waitCleared(20);
-  yield* formation('玉吐き', 4, { y: MID, mokoCarry: 'way' });
+  yield* formation('玉吐き', 4, { y: MID, mokoCarry: 'way', frag: 'A3' });
   yield* sched.wait(100);
   yield* formation('連なり', 5, { y: 90 });
   yield* sched.wait(40);
@@ -169,7 +170,7 @@ function* segmentB() {
   yield* sched.wait(40);
   yield* formation('挟み', 4, { carry: [2, 'bomb'] });   // ボム1個
   yield* sched.waitCleared(20);
-  yield* formation('玉の雨', 3, { ys: [110, MID, 430], gap: 45 });
+  yield* formation('玉の雨', 3, { ys: [110, MID, 430], gap: 45, frags: ['B0', 'B1', 'B2'] });
   yield* sched.wait(40);
   yield* formation('波', 8, { y0: MID, amp: 130, shoot: true });
   yield* sched.wait(70);
@@ -179,7 +180,7 @@ function* segmentB() {
   yield* sched.wait(50);
   yield* formation('階段', 6, { y0: 470, dy: -80 });
   yield* sched.waitCleared(20);
-  yield* formation('玉吐き', 4, { y: MID, shoot: true, mokoCarry: 'pow' });  // ここで貫通が付く想定
+  yield* formation('玉吐き', 4, { y: MID, shoot: true, mokoCarry: 'pow', frag: 'B3' });  // ここで貫通が付く想定
   yield* sched.waitCleared(20);
   yield* formation('連なり', 7, { y: 150, carry: [6, 'way'] });           // 貫通の見せ場
   yield* sched.wait(35);
@@ -195,6 +196,8 @@ function* segmentB() {
   yield* sched.wait(80);
   yield* formation('Uターン', 5, { y: 420, dy: -160 });
   yield* sched.wait(60);
+  yield* formation('玉', 1, { ys: [MID], slow: true, frags: ['B4'] });   // 道中の最後の断片
+  yield* sched.wait(60);
   yield* formation('波', 8, { y0: MID, amp: 150 });
   yield* sched.waitCleared(20);
 }
@@ -204,7 +207,8 @@ export const SEGMENTS = [
   { name: '道中B', gen: segmentB },
 ];
 
-function* stage(startIdx, bossForm, cores) {
+function* stage(startIdx, bossForm, cores, withMission) {
+  if (withMission) yield* mission();
   for (let idx = startIdx; idx < SEGMENTS.length; idx++) {
     const S = SEGMENTS[idx];
     state.seg = { index: idx, name: S.name, t0: state.frame, escaped: 0 };
@@ -223,17 +227,14 @@ function* stage(startIdx, bossForm, cores) {
     }
   }
   yield* bossFight(bossForm, cores);
-  yield* sched.wait(60);
-  state.mode = 'clear';
-  state.clearT = 0;
 }
 
 let token = null;
 // idx: 0 道中A / 1 道中B / 'boss'
-export function startStage(idx = 0, bossForm = 1, cores = null) {
+export function startStage(idx = 0, bossForm = 1, cores = null, withMission = false) {
   if (token) token.alive = false;
   token = { alive: true };
-  sched.add(stage(idx === 'boss' ? SEGMENTS.length : idx, bossForm, cores), token);
+  sched.add(stage(idx === 'boss' ? SEGMENTS.length : idx, bossForm, cores, withMission), token);
 }
 
 // F4：次の区間へ（ボス戦中は次の形態へ）

@@ -20,38 +20,57 @@ function push(x, y, ang, speed, col, opt = {}) {
     curve: opt.curve ?? 0, acc: opt.acc ?? 0,
     hp: opt.hp, maxhp: opt.hp, spin: 0, spinV: opt.spinV ?? 0,
     needle: !!opt.needle, id: 0, kind: opt.kind,
+    ch: opt.ch ?? null,          // 文字の弾（ボス）。描画が文字になるだけで、判定は円のまま
   };
+  if (b.ch) b.r = CFG.textBullet.r;
   state.eBullets.push(b);
   return b;
 }
 
+// text を渡すと文字の弾になる。1文字ずつ順に割り当て、発射元ごとに続きから撃つ
+// （弾数が難易度で変わっても、撃つたびに言葉の続きが出てくる）
+function takeChars(src, text, n) {
+  if (!text) return [];
+  const cs = [...text].filter(c => c !== '　' && c !== ' ');
+  if (src.textKey !== text) { src.textKey = text; src.textPos = 0; }
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(cs[(src.textPos + i) % cs.length]);
+  src.textPos = (src.textPos + n) % cs.length;
+  return out;
+}
+
 // 自機狙いの針。速度は 3.4 で頭打ち
-export function needle(src, speed, col = COL.PINK, off = 0) {
+export function needle(src, speed, col = COL.PINK, off = 0, text = null) {
   const p = state.player;
+  const ch = takeChars(src, text, 1)[0] ?? null;
   const ang = Math.atan2(p.y - src.y, p.x - src.x) + off;
-  return push(src.x, src.y, ang, Math.min(speed, CFG.bullet.speedMax), col, { r: 4, needle: true });
+  return push(src.x, src.y, ang, Math.min(speed, CFG.bullet.speedMax), col, { r: 4, needle: !ch, ch });
 }
 
 // リング。way数は10で頭打ち（原則1・4）。隙間が自機に向くよう位相を取る（原則5）
-export function ring(src, n, speed, col, offset = null) {
+export function ring(src, n, speed, col, offset = null, text = null) {
   n = Math.min(n, CFG.bullet.ringMax);
   n = Math.max(6, Math.round(n * state.diff.count));
   const p = state.player;
   const toP = Math.atan2(p.y - src.y, p.x - src.x);
   const base = offset ?? toP + Math.PI / n;   // 自機方向がちょうど弾と弾の間になる
-  for (let i = 0; i < n; i++) push(src.x, src.y, base + i * Math.PI * 2 / n, speed, col);
+  // 文字は時計回りに並べる（画面上で左から右へ読めるよう、自機側＝左を起点に）
+  const cs = takeChars(src, text, n);
+  for (let i = 0; i < n; i++) push(src.x, src.y, base + i * Math.PI * 2 / n, speed, col, { ch: cs[i] });
 }
 
 // 扇。隣り合う弾の角度差が下限を割るなら n を減らす（原則1）
 const FAN_MIN_ANG = CFG.bullet.minGap / 180;   // 発射から約100px先で隙間64px
-export function fan(src, n, dir, spread, speed, col) {
+export function fan(src, n, dir, spread, speed, col, text = null) {
   n = Math.max(2, Math.round(n * state.diff.count));
   while (n > 2 && spread / (n - 1) < FAN_MIN_ANG) n--;
   if (dir === 'aim') dir = Math.atan2(state.player.y - src.y, state.player.x - src.x);
-  for (let i = 0; i < n; i++) push(src.x, src.y, dir + (i / (n - 1) - 0.5) * spread, speed, col);
+  const cs = takeChars(src, text, n);
+  for (let i = 0; i < n; i++) push(src.x, src.y, dir + (i / (n - 1) - 0.5) * spread, speed, col, { ch: cs[i] });
 }
 
-// 水平レーザー。必ず laserWarn（予告80f）を経る。2本なら間に80px以上（原則3・5）
+// 水平ビーム。必ず laserWarn（予告80f）を経る。2本なら間に80px以上（原則3・5）
+// 予告線のあと、文字の列が横一直線に高速で飛んでくる。1文字ずつ当たり判定がある
 function pickLaserYs(count) {
   const py = state.player.y;
   if (count === 1) return [py];
@@ -73,20 +92,22 @@ export function* laserWarn(src, count) {
   for (const w of warns) w.alive = false;
 }
 
-export function hLaser(src) {
+export function hLaser(src, text = '■■■■■■■■■■■■■■■■■■■■■■■■') {
   if (!src.pendingLaser) throw new Error('laserWarn を経ていない');
-  for (const y of src.pendingLaser) state.lasers.push({ y, w: 0, t: 0, alive: true });
+  const chars = [...text];
+  for (const y of src.pendingLaser)
+    state.lasers.push({ y, head: src.x - 70, chars, alive: true });
   src.pendingLaser = null;
 }
+
+// ビームの i 文字目の x 座標
+export const beamX = (l, i) => l.head + i * CFG.laser.spacing;
 
 export function moveLasers() {
   const L = CFG.laser;
   for (const l of state.lasers) {
-    l.t++;
-    // 太くなって、しばらく照射して、細くなる
-    const u = l.t / L.fire;
-    l.w = L.width * Math.min(1, Math.min(u * 5, (1 - u) * 5));
-    if (l.t >= L.fire) l.alive = false;
+    l.head -= L.speed;
+    if (beamX(l, l.chars.length - 1) < -30) l.alive = false;
   }
   for (const w of state.laserWarns) if (--w.t <= 0) w.alive = false;
 }
@@ -101,7 +122,7 @@ export function bigOrb(x, y, opt = {}) {
   const b = push(x, y, Math.PI + (opt.angle ?? 0), speed / state.diff.speed, '#fff', {
     hp, r: boss ? CFG.orb.rBoss : CFG.orb.rMid, spinV: 0.02 + gameRng.rnd() * 0.02,
   });
-  if (b) { b.id = orbId++; b.boss = boss; }
+  if (b) { b.id = orbId++; b.boss = boss; b.frag = opt.frag ?? null; }
   return b;
 }
 

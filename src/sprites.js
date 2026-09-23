@@ -1,6 +1,7 @@
 // スプライトの事前生成とキャッシュ（技術設計書 9章）
 // 毎フレームのグラデーション生成と shadowBlur は禁止。ここで一度だけ描いて以後 drawImage
 import { COL, GRADE_COL, CFG } from './config.js';
+import { RETRO_FONT } from './text.js';
 
 const SS = 2;                 // 高DPI用に2倍で描いておく
 const cache = new Map();
@@ -308,6 +309,32 @@ export function coreSprite(which, crack) {
   return c;
 }
 
+// ---- 文字の弾：ドット風フォントで1文字。白フチ + 弾の色 ----
+// フォントの読み込みが終わったら作り直す（それまでは代用フォントで描いたものを使う）
+export const GLYPH_SIZE = 22;
+export function glyphSprite(ch, col) {
+  const k = 'g|' + ch + '|' + col;
+  let c = cache.get(k);
+  if (c) return c;
+  const s = GLYPH_SIZE, d = s + 10;
+  c = mk(d, d, g => {
+    g.font = `${s}px ${RETRO_FONT}`;
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.lineJoin = 'round';
+    g.strokeStyle = '#fff'; g.lineWidth = 6; g.strokeText(ch, d / 2, d / 2 + 1);
+    g.fillStyle = col; g.fillText(ch, d / 2, d / 2 + 1);
+  });
+  cache.set(k, c);
+  return c;
+}
+
+export function watchFont() {
+  if (!document.fonts?.load) return;
+  document.fonts.load(`${GLYPH_SIZE}px "DotGothic16"`, 'アイ').then(() => {
+    for (const k of [...cache.keys()]) if (k.startsWith('g|')) cache.delete(k);
+  }).catch(() => {});
+}
+
 // ---- アイテム ----
 export function itemSprite(kind) {
   const k = 'i|' + kind;
@@ -349,5 +376,6 @@ export function prebuild() {
   mokoSprite(); byunSprite();
   for (let f = 1; f <= 3; f++) bossSprite(f);
   for (const w of ['upper', 'lower']) for (let cr = 0; cr < 4; cr++) coreSprite(w, cr);
+  watchFont();
   return cache.size;
 }

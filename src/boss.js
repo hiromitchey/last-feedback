@@ -6,6 +6,8 @@ import * as sched from './sched.js';
 import { needle, ring, fan, bigOrb, laserWarn, hLaser } from './bullets.js';
 import { spawnItem } from './items.js';
 import { fxRng } from './rng.js';
+import { BOSS_TEXT as T } from './text.js';
+import { afterBoss } from './story.js';
 
 const B = () => CFG.boss;
 
@@ -38,8 +40,8 @@ function* upperCore(p) {
   yield* sched.wait(40);
   while (true) {
     yield* sched.charge(p);
-    needle(p, 2.8, COL.PINK, -0.1);
-    needle(p, 2.8, COL.PINK, 0.1);
+    needle(p, 2.8, COL.PINK, -0.1, T.upperCore);
+    needle(p, 2.8, COL.PINK, 0.1, T.upperCore);
     yield* sched.wait(90);
   }
 }
@@ -48,7 +50,7 @@ function* lowerCore(p) {
   yield* sched.wait(100);
   while (true) {
     yield* sched.charge(p);
-    fan(p, 4, 'aim', 1.2, 2.0, COL.CYAN);
+    fan(p, 4, 'aim', 1.2, 2.0, COL.CYAN, T.lowerCore);
     yield* sched.wait(90);
   }
 }
@@ -58,14 +60,14 @@ function* form1Body(b) {
   yield* sched.wait(70);
   while (true) {
     yield* sched.charge(b);
-    ring(b, 8, 1.8, COL.VIOLET);
+    ring(b, 8, 1.8, COL.VIOLET, null, T.ring[1]);
     yield* sched.wait(140);
   }
 }
 function* ringLoop(b, n, sp, col, period) {
   while (true) {
     yield* sched.charge(b);
-    ring(b, n, sp, col);
+    ring(b, n, sp, col, null, T.ring[b.form]);
     yield* sched.wait(period - CFG.warn.shot);
   }
 }
@@ -74,7 +76,7 @@ function* laserLoop(b, count, period) {
   while (true) {
     const c = count === 2 && b.weakenRate >= 1.6 ? 1 : count;   // 45秒続いたら1本に
     yield* laserWarn(b, c);
-    hLaser(b);
+    hLaser(b, T.beam[b.form]);
     yield* sched.wait(period - CFG.laser.warn);
   }
 }
@@ -92,7 +94,7 @@ function* needleLoop(b, period) {
   yield* sched.wait(30);
   while (true) {
     yield* sched.charge(b, 20);
-    needle(b, 3.2, COL.PINK);
+    needle(b, 3.2, COL.PINK, 0, T.needle);
     yield* sched.wait(period - 20);
   }
 }
@@ -138,7 +140,8 @@ export function* bossFight(form = 1, cores = null) {
   if (!b.parts[0].dead) sched.add(upperCore(b.parts[0]), b.parts[0]);
   if (!b.parts[1].dead) sched.add(lowerCore(b.parts[1]), b.parts[1]);
   startForm(b);
-  yield* sched.waitUntil(() => !b.alive);
+  yield* sched.waitUntil(() => b.dying > 0);
+  yield* afterBoss(b);
 }
 
 export function moveBoss() {
@@ -215,9 +218,11 @@ function nextForm(b) {
   sched.add((function* () { yield* sched.wait(90); startForm(b); })(), b);
 }
 
+// 倒しても派手にしない。攻撃が止まり、動きが止まる（物語）
 function startDying(b) {
   b.hp = 0;
   b.dying = 1;
+  b.weakenRate = 1;
   if (b.body) b.body.alive = false;
   for (const p of b.parts) p.dead = true;
   clearDanger();
@@ -228,13 +233,9 @@ function startDying(b) {
   state.bossResult = { sec, timeBonus: tb };
 }
 
-// 撃破の演出（物語の「黙る」演出は Step 15b で差し替える）
+// 撃破後は動かない。灯を消していくのは story.js の afterBoss
 function dyingStep(b) {
   b.dying++;
-  if (b.dying < 150 && b.dying % 12 === 0)
-    boom(b.x + fxRng.range(-70, 70), b.y + fxRng.range(-80, 80), 24, 5);
-  if (b.dying === 150) { flash('#fff', 30); boom(b.x, b.y, 120, 10); state.shake = 20; }
-  if (b.dying >= 240) { b.alive = false; state.boss = null; }
 }
 
 function boom(x, y, n, sp) {

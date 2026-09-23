@@ -5,6 +5,7 @@ import { input, initInput, sample, pressed, syncTarget, BTN } from './input.js';
 import * as sched from './sched.js';
 import { movePlayer, shoot, fireBomb } from './player.js';
 import { moveBoss } from './boss.js';
+import { moveStory } from './story.js';
 import { moveBullets, moveLasers } from './bullets.js';
 import { moveEnemies } from './enemies.js';
 import { moveItems } from './items.js';
@@ -23,7 +24,7 @@ resetWorld();
 function startGame() {
   resetWorld();
   sched.clear();
-  startStage(0);
+  startStage(0, 1, null, true);   // 最初だけミッション表示
   syncTarget(state.player.x, state.player.y);
   state.mode = 'play';
 }
@@ -34,6 +35,7 @@ function doContinue() {
   for (const a of [state.enemies, state.eBullets, state.pBullets, state.items, state.warnings, state.lasers, state.laserWarns]) a.length = 0;
   state.boss = null;
   state.bossWarn = 0;
+  state.logLine = null; state.logQueue.length = 0;
   sched.clear();
   const p = state.player;
   p.lives = state.diff.lives; p.bombs = state.diff.bombs;
@@ -97,9 +99,10 @@ function step() {
       if (state.contT < CFG.continueCount * 60 - 30 && input.tapped) doContinue();
       else if (state.contT <= 0) toTitle();
       break;
-    case 'clear':
-      state.clearT++;
-      if (state.clearT > 90 && input.tapped) toTitle();
+    case 'ending':
+      // 最後の一枚。説明はしない。しばらくしたら触ればタイトルへ
+      state.endT++;
+      if (state.endT > 240 && input.tapped) toTitle();
       break;
   }
   input.tapped = false;
@@ -107,6 +110,8 @@ function step() {
   if (state.mode !== 'pause') {
     moveParticles();
     movePopups();
+    moveStory();
+    if (state.blackout) state.blackout.t++;
     sweep(state.popups);
     if (state.flash && --state.flash.t <= 0) state.flash = null;
     if (state.shake > 0) state.shake = Math.max(0, state.shake - 1);

@@ -1,10 +1,11 @@
 // 敵の挙動：ぷに・もこ・びゅん（設計書 5章）
 import { CFG, COL } from './config.js';
-import { state, nextId, spawnParticle, popup } from './world.js';
+import { state, nextId, spawnParticle } from './world.js';
 import * as sched from './sched.js';
 import { needle, ring, bigOrb } from './bullets.js';
 import { spawnItem } from './items.js';
 import { gameRng, fxRng } from './rng.js';
+import { nextHullNumber } from './story.js';
 
 // opt:
 //   move  : 'straight' | 'wave' | 'converge' | 'uturn' | 'moko' | 'byun'
@@ -22,10 +23,12 @@ export function spawnEnemy(type, x, y, opt = {}) {
     amp: opt.amp ?? 0, freq: opt.freq ?? 0.04, phase: opt.phase ?? 0,
     ty: opt.ty ?? 270, dy: opt.dy ?? 0, phaseN: 0,
     carry: opt.carry ?? null,
+    // 正常な個体（ぷに・びゅん）には船体番号。壊れてから作られた もこ には無い
+    num: type === 'moko' ? null : nextHullNumber(),
   };
   state.enemies.push(e);
   if (opt.shoot && type === 'puni') sched.add(puniShot(e), e);
-  if (type === 'moko') sched.add(mokoAttack(e, opt), e);
+  if (type === 'moko') { e.orbPending = !!opt.orb; e.frag = opt.frag ?? null; sched.add(mokoAttack(e, opt), e); }
   return e;
 }
 
@@ -44,9 +47,10 @@ function* mokoAttack(e, opt) {
   yield* sched.wait(20);
   yield* sched.charge(e);
   ring(e, 8, 1.9, COL.CYAN);
-  if (opt.orb) {
+  if (e.orbPending) {
     yield* sched.wait(50);
-    bigOrb(e.x - 30, e.y);
+    e.orbPending = false;
+    bigOrb(e.x - 30, e.y, { frag: e.frag });
   }
   yield* sched.wait(60);
   yield* sched.charge(e);
@@ -128,7 +132,7 @@ function killEnemy(e) {
     spawnParticle(e.x, e.y, Math.cos(a) * s - 1, Math.sin(a) * s, 18 + fxRng.rnd() * 18, fxRng.pick(cols), 3 + fxRng.rnd() * 3);
   }
   if (big) state.shake = Math.max(state.shake, 6);
-  popup(big ? 'ドーン！' : fxRng.pick(['ポン！', 'ポン！', 'パン！']), e.x, e.y - 10,
-    { size: big ? 28 : 20, col: '#fff', life: 30 });
   if (e.carry) spawnItem(e.carry, e.x, e.y, 1.5, 0);
+  // もこが玉を吐く前に倒されたら、抱えていた玉を落とす（断片を取りこぼさないように）
+  if (e.orbPending) bigOrb(e.x - 10, e.y, { frag: e.frag });
 }

@@ -58,6 +58,11 @@ export function resetWorld() {
   state.bombFx = 0;
   state.bossResult = null;
   state.autoBomb = CFG.autoBomb;
+  state.logLine = null;      // でか玉の断片・撃破後の一言
+  state.logQueue = [];
+  state.mission = null;
+  state.quiet = false;       // 撃破後：自機も撃たない
+  state.blackout = null;
   for (const p of particles) p.alive = false;
 }
 
