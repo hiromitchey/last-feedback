@@ -281,6 +281,7 @@ function drawBooms() {
 // 信号：光の粒と波紋が惑星へ（電波のように、文字は付けない）。届いたら小さな輪が広がって、それきり
 function drawSignals() {
   for (const s of state.signals) {
+    if (s.last) { drawLastSignal(s); continue; }
     if (!s.hit) {
       const u = s.t / s.max, e = u * u * (3 - 2 * u);
       const x = s.x0 + (s.tx - s.x0) * e, y = s.y0 + (s.ty - s.y0) * e;
@@ -303,6 +304,36 @@ function drawSignals() {
     }
     ctx.globalAlpha = 1;
   }
+}
+
+// 最後の信号：灯の消えた母船から、ゆっくり、はっきり。点線の軌跡と電波の輪を残して惑星へ。届いて、それきり
+function drawLastSignal(s) {
+  const u = Math.min(1, s.t / s.max), e = u * u * (3 - 2 * u);
+  const x = s.x0 + (s.tx - s.x0) * e, y = s.y0 + (s.ty - s.y0) * e;
+  // 軌跡（点線）
+  ctx.globalAlpha = s.hit ? Math.max(0, 0.4 - s.hit / 250) : 0.4;
+  ctx.strokeStyle = '#9fe8ff'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 6]);
+  ctx.beginPath(); ctx.moveTo(s.x0, s.y0); ctx.lineTo(x, y); ctx.stroke(); ctx.setLineDash([]);
+  if (!s.hit) {
+    // 電波の輪：進みながら何重にも広がる
+    for (let i = 0; i < 3; i++) {
+      const r = ((s.t + i * 12) % 36) * 1.2 + 4;
+      ctx.globalAlpha = 0.7 * (1 - r / 48);
+      ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#e8fbff'; ctx.beginPath(); ctx.arc(x, y, 4, 0, 7); ctx.fill();
+  } else {
+    // 届いた：輪が2回広がる。何も返ってこない
+    for (const h0 of [0, 40]) {
+      const k = (s.hit - h0) / 60;
+      if (k < 0 || k > 1) continue;
+      ctx.globalAlpha = 0.8 * (1 - k);
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(s.tx, s.ty, 10 + k * 70, 0, 7); ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = 1;
 }
 
 // 化けた番号のちらつき：ときどき1文字が別の記号に入れ替わる（見た目だけ）
@@ -385,6 +416,14 @@ function drawBoss() {
     if (p.glow > 0) drawCharge(p);
   }
   if (b.glow > 0) drawCharge({ x: b.x - 40, y: b.y, r: 40, glow: b.glow });
+  // 最後の発信の前触れ：灯の消えた船体に、小さな灯がひとつ点滅して点く
+  if (b.beacon) {
+    const on = b.beacon.t > 36 || ((b.beacon.t >> 3) & 1);
+    if (on) {
+      ctx.globalAlpha = 0.5; ctx.fillStyle = '#9fe8ff'; ctx.beginPath(); ctx.arc(b.x + 20, b.y - 50, 10, 0, 7); ctx.fill();
+      ctx.globalAlpha = 1; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(b.x + 20, b.y - 50, 3.5, 0, 7); ctx.fill();
+    }
+  }
   // 自己修正：飛んでくる板と「シュウセイ nカイメ」
   const R = b.repair;
   if (R) {

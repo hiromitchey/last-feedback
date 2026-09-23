@@ -146,6 +146,7 @@ export function* afterBoss(b) {
     else { explode(b.x + 20 + rx, b.y + ry, 70); debris(b.x + 20 + rx, b.y + ry, 6); flash('#fff', 8); state.shake = 22; }
     yield* sched.wait(hang ? 70 : 50);
   }
+  b.drift = true;                            // 焼け残りがゆっくり左下へ漂い、惑星から離れていく
   while (b.lights > 0) { b.lights--; yield* sched.wait(40); }
   yield* sched.wait(90);                     // 静かになる
   state.logQueue.length = 0;
@@ -153,9 +154,16 @@ export function* afterBoss(b) {
   yield* sched.waitUntil(() => !state.logLine);
   yield* sched.wait(60);
   showLine([STORY.finalCall], { y: CFG.H / 2 + 150, size: 20, now: true, type: 9 });   // ゆっくり、途切れ途切れ
-  { const [tx, ty] = planetXY(); sendSignal(b.x + 20, b.y - 20, tx, ty, true); }       // 弱い信号がひとつ。届いて、それきり
-  yield* sched.waitUntil(() => !state.logLine);
+  yield* sched.waitUntil(() => !state.logLine || lineProgress(state.logLine).done);
   yield* sched.wait(40);
+  // 言い終えてから、最後の力で発信する：小さな灯がひとつ点滅して点く → 信号が惑星へ → 届いて、それきり
+  b.beacon = { t: 0 };
+  yield* sched.wait(60);
+  const [tx, ty] = planetXY();
+  const sig = sendSignal(b.x + 20, b.y - 50, tx, ty, 'last');
+  yield* sched.waitUntil(() => !sig.alive);
+  b.beacon = null;                           // 最後の灯も消える
+  yield* sched.wait(70);
   state.blackout = { t: 0 };                 // 暗転
   yield* sched.wait(90);
   state.mode = 'ending';

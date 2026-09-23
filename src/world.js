@@ -137,15 +137,20 @@ export function flash(col, t = 12) { state.flash = { col, t, max: t }; }
 // 背景の惑星の位置（描画と同じ）
 export const planetXY = () => [780 - (state.scroll * 0.02) % 40, 120];
 
-export function sendSignal(x, y, tx, ty, weak = false) {
-  state.signals.push({ x0: x, y0: y, tx, ty, t: 0, max: weak ? 150 : 90, weak, hit: 0, alive: true });
+// kind: 'normal' | 'weak' | 'last'（最後の信号：ゆっくり、はっきり、軌跡を残す）
+export function sendSignal(x, y, tx, ty, kind = 'normal') {
+  if (kind === true) kind = 'weak';
+  const s = { x0: x, y0: y, tx, ty, t: 0, max: kind === 'last' ? 200 : kind === 'weak' ? 150 : 90,
+    weak: kind === 'weak', last: kind === 'last', hit: 0, alive: true };
+  state.signals.push(s);
+  return s;
 }
 export function moveSignals() {
   for (const s of state.signals) {
     s.t++;
     if (s.t === s.max) s.hit = 1;
     if (s.hit) s.hit++;
-    if (s.hit > 50) s.alive = false;
+    if (s.hit > (s.last ? 110 : 50)) s.alive = false;
   }
 }
 

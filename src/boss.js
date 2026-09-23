@@ -361,6 +361,9 @@ export function hangRot(t) {
 // 撃破後は動かない。灯を消していくのは story.js の afterBoss
 function dyingStep(b) {
   b.dying++;
+  if (b.beacon) b.beacon.t++;
+  // 焼け残りがゆっくり左下へ漂う（惑星から離れ、最後の信号の道のりが見えるように）
+  if (b.drift) { b.x += (650 - b.x) * 0.008; b.y += (CFG.H / 2 + 110 - b.y) * 0.008; }
   // 羽のヒビが伸びる
   for (const k in b.cracks || {}) if (b.cracks[k] < 30) b.cracks[k]++;
   // もげた羽：付け根で少し曲がる（ボキッ）→ ちぎれて、回転しながら落ちていく
