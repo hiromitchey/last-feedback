@@ -133,16 +133,18 @@ export function* afterBoss(b) {
   b.burnt = true;
   // 3. おさまる（くすぶる）
   for (let i = 0; i < 5; i++) { smoke(b.x + 20 + fxRng.range(-60, 60), b.y + fxRng.range(-40, 40)); yield* sched.wait(20); }
-  // 4. ボキッ：羽の付け根にヒビ → 曲がる → もげて回転しながら落ちる。下の羽、一拍おいて上の羽
+  // 4. ボキッ：下の羽はもげて回転しながら落ちる。上の羽はポロッと折れて、落ちそうなままぶら下がる
   for (const side of ['down', 'up']) {
     const [rx, ry] = BOSS_ARM_ROOT[side];
+    const hang = side === 'up';
     b.cracks = { ...(b.cracks || {}), [side]: 1 };
     state.shake = 5;
     yield* sched.wait(35);
-    b.arms = { ...(b.arms || {}), [side]: { t: 0 } };      // 付け根で曲がり始める（boss.js が動かす）
+    b.arms = { ...(b.arms || {}), [side]: { t: 0, hang } };   // 付け根で曲がり始める（boss.js が動かす）
     yield* sched.wait(18);
-    explode(b.x + 20 + rx, b.y + ry, 70); debris(b.x + 20 + rx, b.y + ry, 6); flash('#fff', 8); state.shake = 22;
-    yield* sched.wait(side === 'down' ? 50 : 70);
+    if (hang) { explode(b.x + 20 + rx, b.y + ry, 35); debris(b.x + 20 + rx, b.y + ry, 2); state.shake = 10; }
+    else { explode(b.x + 20 + rx, b.y + ry, 70); debris(b.x + 20 + rx, b.y + ry, 6); flash('#fff', 8); state.shake = 22; }
+    yield* sched.wait(hang ? 70 : 50);
   }
   while (b.lights > 0) { b.lights--; yield* sched.wait(40); }
   yield* sched.wait(90);                     // 静かになる

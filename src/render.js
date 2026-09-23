@@ -6,6 +6,7 @@ import * as S from './sprites.js';
 import { fxRng } from './rng.js';
 import { lineProgress, LIGHTS } from './story.js';
 import { PART_COLORS } from './midboss.js';
+import { HANG_ROT } from './boss.js';
 import { RETRO_FONT, STORY } from './text.js';
 
 // ボスの灯の位置（ボスの絵の中心からのずれ）
@@ -318,19 +319,29 @@ function drawBoss() {
   if (b.arms) {
     // 羽がもげる：胴体と、まだ付いている羽と、落ちていく羽を別々に描く
     // 羽は胴体より奥（元の絵でも羽が下）。落ちる羽は胴体の後ろをくぐる
-    for (const side of ['up', 'down']) drawArm(form, side, b.x + 20, b.y, b.arms[side]);
+    // ぶら下がっている羽だけは手前（折れているのが見えるように）
+    const hanging = side => b.arms[side] && b.arms[side].hang;
+    for (const side of ['up', 'down']) if (!hanging(side)) drawArm(form, side, b.x + 20, b.y, b.arms[side]);
     blit(S.bossSprite(form, 'body'), b.x + 20, b.y);
+    for (const side of ['up', 'down']) if (hanging(side)) drawArm(form, side, b.x + 20, b.y, b.arms[side]);
   } else blit(S.bossSprite(form), b.x + jit + 20, b.y);
   ctx.globalAlpha = 1;
   for (const [side, c] of Object.entries(b.cracks || {}))
-    if (!(b.arms && b.arms[side] && b.arms[side].t > 18)) drawCrack(b.x + 20, b.y, side, c / 30);
+    if (!(b.arms && b.arms[side] && b.arms[side].t > 18 && !b.arms[side].hang)) drawCrack(b.x + 20, b.y, side, c / 30);
   // 灯（窓・スラスター・腕の先）。撃破後、ひとつずつ消える。折れたら半分ごとに付いていく
   BOSS_LIGHTS.forEach(([dx, dy, col], i) => {
     if (i >= lit) return;
     // 羽の先の灯は、羽と一緒に落ちて消える
     const side = dy < -90 ? 'up' : dy > 90 ? 'down' : null;
-    if (side && b.arms && b.arms[side] && b.arms[side].t > 18) return;
-    const x = b.x + jit + 20 + dx, y = b.y + dy;
+    const arm = side && b.arms && b.arms[side];
+    if (arm && arm.t > 18 && !arm.hang) return;
+    let x = b.x + jit + 20 + dx, y = b.y + dy;
+    if (arm && arm.hang) {
+      // ぶら下がった羽の先の灯：羽と一緒に回る
+      const [rx, ry] = S.BOSS_ARM_ROOT[side], c = Math.cos(arm.rot), s = Math.sin(arm.rot);
+      x = b.x + 20 + rx + (dx - rx) * c - (dy - ry) * s;
+      y = b.y + ry + (dx - rx) * s + (dy - ry) * c;
+    }
     ctx.globalAlpha = 0.35 + 0.15 * Math.sin(state.frame * 0.1 + i);
     ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, 9, 0, 7); ctx.fill();
     ctx.globalAlpha = 1;
@@ -575,7 +586,8 @@ function drawEnding() {
   ctx.fillStyle = '#07080f'; ctx.beginPath(); ctx.arc(840, 200, 160, 0, 7); ctx.fill();
   // 止まった母船。継ぎ接ぎだらけ
   ctx.globalAlpha = 0.55;
-  blit(S.bossSprite(3, 'body'), 640, 330, -0.12, 1.05);
+  blit(S.bossSprite(3, 'body'), 640, 330);
+  drawArm(3, 'up', 640, 330, { x: 0, y: 0, rot: HANG_ROT + Math.sin(t * 0.03) * 0.04 });   // 落ちそうなまま、ぶら下がっている
   drawArm(3, 'down', 600, 330, { x: 200, y: 90, rot: 0.9 });   // もげた羽が漂っている
   ctx.globalAlpha = 1;
   // 残骸：動かない船。番号が読める

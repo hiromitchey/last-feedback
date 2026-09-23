@@ -349,6 +349,15 @@ function startDying(b) {
   state.bossResult = { sec, timeBonus: tb };
 }
 
+// ぶら下がる羽：ガクッと傾いて少し跳ね返り、そのあとゆらゆら揺れ続ける（落ちそうで落ちない）
+export const HANG_ROT = 0.6;   // 外側（左）へ折れ曲がる
+export function hangRot(t) {
+  if (t < 18) return HANG_ROT * 0.3 * (t / 18);                       // ヒビで少し曲がる
+  const u = t - 18;
+  if (u < 40) return HANG_ROT * (1 - Math.exp(-u / 6) * Math.cos(u / 3)); // ガクッ → 跳ね返り
+  return HANG_ROT + Math.sin(u * 0.05) * 0.05;                         // ゆらゆら
+}
+
 // 撃破後は動かない。灯を消していくのは story.js の afterBoss
 function dyingStep(b) {
   b.dying++;
@@ -358,6 +367,7 @@ function dyingStep(b) {
   for (const [side, a] of Object.entries(b.arms || {})) {
     const sy = side === 'up' ? -1 : 1;
     a.t++;
+    if (a.hang) { a.x = 0; a.y = 0; a.rot = hangRot(a.t); continue; }
     // 下の羽はそのまま落ちる。上の羽はいったん上に弾けてから落ちる
     if (a.t <= 18) { a.rot = sy * 0.22 * (a.t / 18); a.x = 0; a.y = 0; a.vx = sy > 0 ? -0.6 : 1.2; a.vy = sy > 0 ? 1.2 : -3.2; a.vr = sy * 0.03; }
     else { a.x += a.vx; a.y += a.vy; a.vy += 0.12; a.rot += a.vr; }
