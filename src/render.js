@@ -572,7 +572,7 @@ function drawTouchUI() {
 
 function drawTitle() {
   // 白に水色の縁取り（惑星へ飛ぶ信号と同じ系統）
-  text('LAST FEEDBACK', CFG.W / 2, CFG.H / 2 - 50, 72, '#f4fbff', 'center', '#4FC3F7');
+  text('LAST FEEDBACK', CFG.W / 2, CFG.H / 2 - 50, 72, '#c9dbe8', 'center', '#2f6f96');
   if ((state.frame >> 5) & 1)
     text('クリック / タップ / Z ではじめる', CFG.W / 2, CFG.H / 2 + 40, 22, '#FFD54F');
   const help = [
