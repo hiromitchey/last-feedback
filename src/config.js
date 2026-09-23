@@ -19,7 +19,7 @@ export const CFG = {
     { ways: 7, dmg: 1.6, pierce: true,  spread: 0.14 },
   ],
   gradeCost: [2, 3, 4],
-  scatterOnHit: 4,            // 被弾時にばら撒くパワー
+  scatterOnHit: 1,            // 被弾時にばら撒くパワー（設計書は4。ぬるいので1に。PLAN.md）
 
   // 【試験】ショットのエネルギー。撃つと減り、撃たないと回復する。F9 でオン・オフ
   energy: {
