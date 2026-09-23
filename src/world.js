@@ -133,7 +133,7 @@ export function movePopups() {
 
 export function flash(col, t = 12) { state.flash = { col, t, max: t }; }
 
-// ---- 信号：母船から惑星へ。「ｵｳﾄｳｾﾖ」を乗せて飛び、届いても何も返ってこない（見た目だけ） ----
+// ---- 信号：母船から惑星へ。電波のように飛び、届いても何も返ってこない（見た目だけ） ----
 // 背景の惑星の位置（描画と同じ）
 export const planetXY = () => [780 - (state.scroll * 0.02) % 40, 120];
 

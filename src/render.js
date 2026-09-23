@@ -278,7 +278,7 @@ function drawBooms() {
   ctx.globalAlpha = 1;
 }
 
-// 信号：光の粒と波紋が惑星へ。「ｵｳﾄｳｾﾖ」が付いている。届いたら小さな輪が広がって、それきり
+// 信号：光の粒と波紋が惑星へ（電波のように、文字は付けない）。届いたら小さな輪が広がって、それきり
 function drawSignals() {
   for (const s of state.signals) {
     if (!s.hit) {
@@ -294,8 +294,6 @@ function drawSignals() {
       ctx.globalAlpha = a * 0.6;                    // 波紋
       ctx.strokeStyle = '#9fe8ff'; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(x, y, 6 + (s.t % 20), 0, 7); ctx.stroke();
-      ctx.globalAlpha = a;
-      text('ｵｳﾄｳｾﾖ', x + 4, y - 12, s.weak ? 8 : 10, '#9fe8ff', 'center', 'rgba(10,14,30,.8)');
     } else {
       // 届いた：輪が広がって消える。何も返ってこない
       const u = s.hit / 50;
