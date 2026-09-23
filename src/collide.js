@@ -43,10 +43,8 @@ function hitOrbs(b) {
 function breakOrb(o) {
   o.alive = false;
   state.score += CFG.score.orb;
-  scatter('kakera', CFG.orb.kakera, o.x, o.y, 1.6, 3.2);
+  scatter('kakera', o.boss ? CFG.orb.kakeraBoss : CFG.orb.kakera, o.x, o.y, 1.6, 3.2);
   if (o.boss) scatter('power', 1, o.x, o.y, 0, 2, 0);
-  const p = state.player;
-  p.energy = Math.min(CFG.energy.max, p.energy + CFG.energy.orbBonus);
   for (let i = 0; i < 30; i++) {
     const a = fxRng.rnd() * Math.PI * 2, s = 2 + fxRng.rnd() * 5;
     spawnParticle(o.x, o.y, Math.cos(a) * s, Math.sin(a) * s, 20 + fxRng.rnd() * 25,
@@ -104,6 +102,11 @@ export function collide() {
     } else if (it.kind === 'kakera') {
       state.score += CFG.score.kakera;
       popup('+' + CFG.score.kakera, it.x, it.y - 12, { size: 14, col: '#fff', life: 24 });
+      const EN = CFG.energy;
+      if (EN.enabled) {
+        p.energy = Math.min(EN.max, p.energy + EN.kakera);
+        if (p.empty) p.lockT -= EN.kakeraLock;
+      }
     } else if (it.kind === 'bomb') {
       p.bombs = Math.min(p.bombs + 1, 6);
     }

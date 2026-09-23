@@ -29,7 +29,8 @@ export const CFG = {
     regen: 1.2,                  // 撃っていないときの回復量/フレーム（空→満タン 約1.4秒）
     regenDelay: 10,              // 撃つのをやめてから回復が始まるまで
     lock: 180,                   // 切れたら撃てない時間（3秒）。その間にゲージが満タンまで戻る
-    orbBonus: 30,                // でか玉を割ると回復
+    kakera: 12,                  // かけらを1個拾うと回復（でか玉1個で3個 = 36）
+    kakeraLock: 30,              // 撃てない間に拾うと、待ち時間がこれだけ縮む
   },
 
   bullet: { cap: 30, orbWeight: 3, speedMax: 3.4, ringMax: 10, minGap: 64 },
@@ -40,7 +41,7 @@ export const CFG = {
     moko: { hp: 50, r: 22, size: 80, score: 600 },
     byun: { hp: 12, r: 13, size: 44, score: 240 },
   },
-  orb: { hpMid: 8, hpBoss: 20, rMid: 14, rBoss: 18, speed: 1.4, slowSpeed: 1.2, kakera: 3 },
+  orb: { hpMid: 8, hpBoss: 20, rMid: 14, rBoss: 18, speed: 1.4, slowSpeed: 1.2, kakera: 3, kakeraBoss: 5 },
 
   item: { r: 10, pickR: 30, drift: 1.2, life: 60 * 12 },
 
