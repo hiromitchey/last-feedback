@@ -22,6 +22,7 @@ export const state = {
   popups: [],
   booms: [],                // 爆発（見た目だけ）
   debris: [],               // 破片（見た目だけ）
+  signals: [],              // 母船から惑星への信号（見た目だけ）
   boss: null,
   seg: null,                // 道中の区間 { index, t, escaped }
   segCap: null,             // 区間ごとの同時弾上限
@@ -55,6 +56,7 @@ export function resetWorld() {
   state.popups.length = 0;
   state.booms.length = 0;
   state.debris.length = 0;
+  state.signals.length = 0;
   state.boss = null;
   state.seg = null;
   state.segCap = null;
@@ -130,6 +132,22 @@ export function movePopups() {
 }
 
 export function flash(col, t = 12) { state.flash = { col, t, max: t }; }
+
+// ---- 信号：母船から惑星へ。「ｵｳﾄｳｾﾖ」を乗せて飛び、届いても何も返ってこない（見た目だけ） ----
+// 背景の惑星の位置（描画と同じ）
+export const planetXY = () => [780 - (state.scroll * 0.02) % 40, 120];
+
+export function sendSignal(x, y, tx, ty, weak = false) {
+  state.signals.push({ x0: x, y0: y, tx, ty, t: 0, max: weak ? 150 : 90, weak, hit: 0, alive: true });
+}
+export function moveSignals() {
+  for (const s of state.signals) {
+    s.t++;
+    if (s.t === s.max) s.hit = 1;
+    if (s.hit) s.hit++;
+    if (s.hit > 50) s.alive = false;
+  }
+}
 
 // ---- 爆発：広がる火の玉＋リング＋火花（判定に関与しない） ----
 export function explode(x, y, size = 40) {

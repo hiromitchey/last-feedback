@@ -1,6 +1,6 @@
 // 描画パイプライン（技術設計書 9章）。論理座標は常に 960×540
 import { CFG, COL } from './config.js';
-import { state, particles } from './world.js';
+import { state, particles, planetXY } from './world.js';
 import { input, touchButtons } from './input.js';
 import * as S from './sprites.js';
 import { fxRng } from './rng.js';
@@ -56,8 +56,9 @@ function drawBackground() {
   ctx.fillRect(0, 0, CFG.W, CFG.H);
   // 惑星（ずっと奥に見えている。夜側に灯りがひとつも無い）
   // 面が進むほど大きく見える（近づいている）
-  const px = 780 - (state.scroll * 0.02) % 40, k = state.planet ?? 1;
-  blit(S.planetSprite(), px, 120, 0, 0.75 * k);
+  const [px, py] = planetXY(), k = state.planet ?? 1;
+  blit(S.planetSprite(), px, py, 0, 0.75 * k);
+  drawSignals();
   // ワープ中は星が横に伸びて線になる
   const streak = state.warp ? Math.sin(Math.PI * Math.min(1, state.warp.t / CFG.warpFrames)) : 0;
   for (const L of layers) {
@@ -275,6 +276,35 @@ function drawBooms() {
     ctx.beginPath(); ctx.arc(b.x, b.y, r * 1.35, 0, 7); ctx.stroke();
   }
   ctx.globalAlpha = 1;
+}
+
+// 信号：光の粒と波紋が惑星へ。「ｵｳﾄｳｾﾖ」が付いている。届いたら小さな輪が広がって、それきり
+function drawSignals() {
+  for (const s of state.signals) {
+    if (!s.hit) {
+      const u = s.t / s.max, e = u * u * (3 - 2 * u);
+      const x = s.x0 + (s.tx - s.x0) * e, y = s.y0 + (s.ty - s.y0) * e;
+      const a = s.weak ? 0.45 : 0.8;
+      for (let i = 0; i < 3; i++) {                 // 後ろに尾を引く
+        const ue = Math.max(0, u - i * 0.04), ee = ue * ue * (3 - 2 * ue);
+        ctx.globalAlpha = a * (1 - i * 0.3);
+        ctx.fillStyle = '#9fe8ff';
+        ctx.beginPath(); ctx.arc(s.x0 + (s.tx - s.x0) * ee, s.y0 + (s.ty - s.y0) * ee, s.weak ? 2 : 3 - i * 0.6, 0, 7); ctx.fill();
+      }
+      ctx.globalAlpha = a * 0.6;                    // 波紋
+      ctx.strokeStyle = '#9fe8ff'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(x, y, 6 + (s.t % 20), 0, 7); ctx.stroke();
+      ctx.globalAlpha = a;
+      text('ｵｳﾄｳｾﾖ', x + 4, y - 12, s.weak ? 8 : 10, '#9fe8ff', 'center', 'rgba(10,14,30,.8)');
+    } else {
+      // 届いた：輪が広がって消える。何も返ってこない
+      const u = s.hit / 50;
+      ctx.globalAlpha = (1 - u) * (s.weak ? 0.4 : 0.7);
+      ctx.strokeStyle = '#9fe8ff'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(s.tx, s.ty, 8 + u * 40, 0, 7); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
 }
 
 // 化けた番号のちらつき：ときどき1文字が別の記号に入れ替わる（見た目だけ）

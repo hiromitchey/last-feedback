@@ -5,7 +5,7 @@ import { state } from './world.js';
 import * as sched from './sched.js';
 import { STORY } from './text.js';
 import { BOSS_ARM_ROOT } from './sprites.js';
-import { explode, flash, debris, smoke } from './world.js';
+import { explode, flash, debris, smoke, sendSignal, planetXY } from './world.js';
 import { fxRng } from './rng.js';
 
 const TYPE = 4;       // タイプライター：1文字あたりのフレーム
@@ -153,6 +153,7 @@ export function* afterBoss(b) {
   yield* sched.waitUntil(() => !state.logLine);
   yield* sched.wait(60);
   showLine([STORY.finalCall], { y: CFG.H / 2 + 150, size: 20, now: true, type: 9 });   // ゆっくり、途切れ途切れ
+  { const [tx, ty] = planetXY(); sendSignal(b.x + 20, b.y - 20, tx, ty, true); }       // 弱い信号がひとつ。届いて、それきり
   yield* sched.waitUntil(() => !state.logLine);
   yield* sched.wait(40);
   state.blackout = { t: 0 };                 // 暗転
