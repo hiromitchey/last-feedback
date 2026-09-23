@@ -5,7 +5,7 @@ import * as sched from './sched.js';
 import { needle, ring, bigOrb } from './bullets.js';
 import { spawnItem } from './items.js';
 import { gameRng, fxRng } from './rng.js';
-import { nextHullNumber } from './story.js';
+import { nextHullNumber, nextBrokenNumber } from './story.js';
 
 // opt:
 //   move  : 'straight' | 'wave' | 'converge' | 'uturn' | 'moko' | 'byun'
@@ -24,7 +24,9 @@ export function spawnEnemy(type, x, y, opt = {}) {
     ty: opt.ty ?? 270, dy: opt.dy ?? 0, phaseN: 0,
     carry: opt.carry ?? null,
     // 正常な個体（ぷに・びゅん）には船体番号。壊れてから作られた もこ には無い
-    num: type === 'moko' || type === 'guni' ? null : nextHullNumber(),
+    // 兄弟（ぷに・びゅん・子機）は正しい番号、壊れかけ（もこ・ゆがみ）は化けた番号
+    num: type === 'moko' || type === 'guni' ? nextBrokenNumber() : nextHullNumber(),
+    broken: type === 'moko' || type === 'guni',
     // ゆがみは1体ずつ動きがばらばら（揺れの周期・止まるタイミング）
     wob: type === 'guni' ? { a1: gameRng.range(20, 60), f1: gameRng.range(0.02, 0.06), a2: gameRng.range(5, 20),
       f2: gameRng.range(0.1, 0.2), p: gameRng.rnd() * 6, stopAt: 60 + ((gameRng.rnd() * 120) | 0), rot: 0 } : null,

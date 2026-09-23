@@ -118,7 +118,10 @@ export function render(debug) {
     const rot = e.type === 'byun' ? e.ang - Math.PI : e.type === 'guni' ? e.wob.rot : 0;
     blit(spr[e.type], e.x, e.y, rot, e.type === 'chibi' ? chibiScale : 1);
     // 船体番号（047 の前後。047 だけは無い）
-    if (e.num) text(e.num, e.x + 2, e.y + e.r * 0.55, e.type === 'chibi' ? 7 : 10, '#fff', 'center', 'rgba(42,33,64,.8)', RETRO_FONT);
+    if (e.num) {
+      const size = e.type === 'chibi' ? 7 : e.type === 'moko' ? 13 : 10;
+      text(e.broken ? flicker(e.num) : e.num, e.x + 2, e.y + e.r * 0.55, size, '#fff', 'center', 'rgba(42,33,64,.8)', RETRO_FONT);
+    }
     ctx.globalAlpha = 1;
     // アイテムを持っている個体には目印（倒すと落とす）
     if (e.carry) blit(S.itemSprite(e.carry), e.x + e.r * 0.6, e.y - e.r - 8, 0, 0.62);
@@ -210,6 +213,8 @@ function drawMid() {
   }
   if (m.glitch > 0) drawGlitch(S.midSprite(m.kind), m.x + jx, m.y);
   else blit(S.midSprite(m.kind), m.x + jx, m.y);
+  // 化けた番号
+  text(flicker(m.num), m.x + jx + 6, m.y + 34, 14, '#fff', 'center', 'rgba(42,33,64,.85)', RETRO_FONT);
   // 部品（修理機）。付け直すたびに色が変わる
   for (const p of m.parts) {
     if (!p.dead) drawPlate(p.x + jx, p.y, PART_COLORS[p.col], p.hp / p.maxhp, p.hitFlash);
@@ -218,6 +223,15 @@ function drawMid() {
   }
   ctx.globalAlpha = 1;
   if (m.glow > 0) drawCharge({ x: m.x - 20, y: m.y, r: 36, glow: m.glow });
+}
+
+// 化けた番号のちらつき：ときどき1文字が別の記号に入れ替わる（見た目だけ）
+const FLICK = ['■', '?', '#', '_'];
+function flicker(num) {
+  if (fxRng.rnd() > 0.06) return num;
+  const d = [...num];
+  d[(fxRng.rnd() * d.length) | 0] = FLICK[(fxRng.rnd() * FLICK.length) | 0];
+  return d.join('');
 }
 
 // ノイズ：絵を横の帯に切って、帯ごとに左右へずらす

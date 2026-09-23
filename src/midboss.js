@@ -7,7 +7,7 @@ import { needle, ring, fan, bigOrb, phrase } from './bullets.js';
 import { spawnItem } from './items.js';
 import { fxRng } from './rng.js';
 import { spawnEnemy } from './enemies.js';
-import { showLine } from './story.js';
+import { showLine, MID_NUMBERS } from './story.js';
 import { STORY, MID_TEXT } from './text.js';
 
 // ---- 中ボスごとの攻撃（普通の弾。声は母船だけ） ----
@@ -147,7 +147,7 @@ export function* midbossFight(kind) {
   yield* sched.wait(70);
   const hp = M.hp[kind - 1] * state.diff.hp;
   const m = {
-    kind, x: CFG.W + 120, y: CFG.H / 2, r: M.r, hp, maxhp: hp,
+    kind, x: CFG.W + 120, y: CFG.H / 2, r: M.r, hp, maxhp: hp, num: MID_NUMBERS[kind],
     alive: true, hitFlash: 0, glow: 0, id: -10, t: 0, entering: true, dying: 0, sweep: 0,
   };
   m.parts = (K.parts ?? []).map((d, i) => ({

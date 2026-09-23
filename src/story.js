@@ -69,8 +69,32 @@ const HULL_POOL = (() => {
   }
   return [...first, ...rest];
 })();
-let numIdx = 0;
-export const resetHullNumbers = () => { numIdx = 0; };
+let numIdx = 0, brokenIdx = 0;
+export const resetHullNumbers = () => { numIdx = 0; brokenIdx = 0; };
+
+// 壊れかけの機体（もこ・ゆがみ）の番号：兄弟より後に作られた大きい番号で、1桁が化けている
+const BROKEN_POOL = (() => {
+  const out = [];
+  let seed = 0xb40c;
+  const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296);
+  const used = new Set();
+  while (out.length < 400) {
+    const n = 300 + Math.floor(rnd() * 700);
+    if (used.has(n)) continue;
+    used.add(n);
+    const d = [...String(n)];
+    d[Math.floor(rnd() * 3)] = rnd() < 0.6 ? '■' : '?';
+    out.push(d.join(''));
+  }
+  return out;
+})();
+export function nextBrokenNumber() {
+  const n = BROKEN_POOL[brokenIdx % BROKEN_POOL.length];
+  brokenIdx++;
+  return n;
+}
+// 中ボスの番号（化けている）
+export const MID_NUMBERS = { 1: '04■', 2: '1?2', 3: '■■■' };
 export function nextHullNumber() {
   const n = HULL_POOL[numIdx % HULL_POOL.length];
   numIdx++;
