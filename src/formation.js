@@ -112,78 +112,90 @@ export function* formation(kind, n, opt = {}) {
   }
 }
 
-// ---- 道中A：操作を覚える。最初は敵を少なめに、後半にかけて増やす。でか玉の初出 ----
+// ---- 道中A：操作を覚える。最初の1編隊だけ少なめ、そこからモブを増やしていく。でか玉の初出 ----
 function* segmentA() {
   yield* sched.wait(60);
   yield* formation('連なり', 3, { y: MID, carry: [2, 'way'] });           // 3体だけ。最初の1個
-  yield* sched.waitCleared(30);
-  yield* formation('連なり', 3, { y: 150 });
-  yield* sched.wait(80);
-  yield* formation('連なり', 3, { y: 390 });
-  yield* sched.waitCleared(30);
-  yield* formation('玉', 1, { ys: [MID - 40], slow: true });               // 初対面：何もない所に1個だけ
-  yield* sched.wait(170);
-  yield* formation('連なり', 3, { y: 380 });
-  yield* sched.wait(60);
-  yield* formation('連なり', 3, { y: 160, carry: [2, 'pow'] });
-  yield* sched.waitCleared(30);
-  yield* formation('波', 4, { y0: MID, amp: 110, carry: [3, 'way'] });
-  yield* sched.wait(100);
-  yield* formation('波', 4, { y0: 200, amp: 80 });
-  yield* sched.waitCleared(30);
-  yield* formation('階段', 4, { y0: 110, dy: 90, shoot: true });
-  yield* sched.wait(90);
-  yield* formation('階段', 4, { y0: 430, dy: -90 });
-  yield* sched.waitCleared(30);
-  yield* formation('玉', 2, { ys: [140, 400], gap: 70 });                // 高さ違いの2個
-  yield* sched.wait(90);
+  yield* sched.waitCleared(20);
+  yield* formation('連なり', 4, { y: 150 });
+  yield* sched.wait(50);
+  yield* formation('連なり', 4, { y: 390 });
+  yield* sched.wait(50);
   yield* formation('連なり', 4, { y: MID });
-  yield* sched.waitCleared(30);
-  yield* formation('波', 5, { y0: 200, amp: 90, shoot: true, carry: [4, 'pow'] });
-  yield* sched.wait(80);
-  yield* formation('波', 5, { y0: 340, amp: 90, phase: Math.PI });
-  yield* sched.waitCleared(30);
-  yield* formation('玉吐き', 2, { y: MID, mokoCarry: 'way' });
-  yield* sched.wait(120);
-  yield* formation('連なり', 4, { y: 90 });
+  yield* sched.waitCleared(20);
+  yield* formation('玉', 1, { ys: [MID - 40], slow: true });               // 初対面：何もない所に1個だけ
+  yield* sched.wait(150);
+  yield* formation('連なり', 5, { y: 380 });
+  yield* sched.wait(45);
+  yield* formation('連なり', 5, { y: 160, carry: [4, 'pow'] });
+  yield* sched.waitCleared(20);
+  yield* formation('波', 6, { y0: MID, amp: 110, carry: [5, 'way'] });
+  yield* sched.wait(70);
+  yield* formation('波', 6, { y0: 200, amp: 80, phase: Math.PI });
+  yield* sched.waitCleared(20);
+  yield* formation('階段', 5, { y0: 90, dy: 85, shoot: true });
   yield* sched.wait(60);
-  yield* formation('連なり', 4, { y: 450 });
-  yield* sched.waitCleared(30);
+  yield* formation('階段', 5, { y0: 450, dy: -85 });
+  yield* sched.waitCleared(20);
+  yield* formation('玉', 2, { ys: [140, 400], gap: 70 });                // 高さ違いの2個
+  yield* sched.wait(60);
+  yield* formation('連なり', 5, { y: MID });
+  yield* sched.wait(40);
+  yield* formation('連なり', 4, { y: 90 });
+  yield* sched.waitCleared(20);
+  yield* formation('波', 6, { y0: 200, amp: 90, shoot: true, carry: [5, 'pow'] });
+  yield* sched.wait(50);
+  yield* formation('波', 6, { y0: 340, amp: 90, phase: Math.PI });
+  yield* sched.waitCleared(20);
+  yield* formation('玉吐き', 4, { y: MID, mokoCarry: 'way' });
+  yield* sched.wait(100);
+  yield* formation('連なり', 5, { y: 90 });
+  yield* sched.wait(40);
+  yield* formation('連なり', 5, { y: 450 });
+  yield* sched.wait(40);
+  yield* formation('階段', 5, { y0: 110, dy: 80 });
+  yield* sched.waitCleared(20);
 }
 
-// ---- 道中B：高速型と面弾。途中で貫通が付く ----
+// ---- 道中B：高速型と面弾。モブ多め。途中で貫通が付く ----
 function* segmentB() {
   yield* sched.wait(60);
-  yield* formation('追い越し', 4, { carry: [3, 'pow'] });
-  yield* sched.waitCleared(30);
+  yield* formation('追い越し', 6, { ys: [120, 400, 200, 330, 80, 460], gap: 28, carry: [5, 'pow'] });
+  yield* sched.waitCleared(20);
   yield* formation('挟み', 4, { shoot: true, carry: [1, 'pow'] });
-  yield* sched.wait(110);
-  yield* formation('連なり', 4, { y: MID, shoot: true });
-  yield* sched.waitCleared(30);
+  yield* sched.wait(70);
+  yield* formation('連なり', 6, { y: MID, shoot: true });
+  yield* sched.wait(40);
+  yield* formation('挟み', 4, {});
+  yield* sched.waitCleared(20);
   yield* formation('玉の雨', 3, { ys: [110, MID, 430], gap: 45 });
-  yield* sched.wait(60);
-  yield* formation('波', 6, { y0: MID, amp: 130, shoot: true });
-  yield* sched.wait(90);
-  yield* formation('追い越し', 3, { ys: [100, 440, 270], gap: 40 });
-  yield* sched.waitCleared(30);
-  yield* formation('階段', 5, { y0: 90, dy: 85, shoot: true });
-  yield* sched.waitCleared(30);
+  yield* sched.wait(40);
+  yield* formation('波', 8, { y0: MID, amp: 130, shoot: true });
+  yield* sched.wait(70);
+  yield* formation('追い越し', 5, { ys: [100, 440, 270, 180, 360], gap: 30 });
+  yield* sched.waitCleared(20);
+  yield* formation('階段', 6, { y0: 70, dy: 80, shoot: true });
+  yield* sched.wait(50);
+  yield* formation('階段', 6, { y0: 470, dy: -80 });
+  yield* sched.waitCleared(20);
   yield* formation('玉吐き', 4, { y: MID, shoot: true, mokoCarry: 'pow' });  // ここで貫通が付く想定
-  yield* sched.waitCleared(30);
-  yield* formation('連なり', 5, { y: 150, carry: [4, 'way'] });           // 貫通の見せ場
-  yield* sched.wait(50);
-  yield* formation('連なり', 5, { y: 390 });
-  yield* sched.wait(50);
-  yield* formation('連なり', 5, { y: MID, shoot: true });
-  yield* sched.waitCleared(30);
+  yield* sched.waitCleared(20);
+  yield* formation('連なり', 7, { y: 150, carry: [6, 'way'] });           // 貫通の見せ場
+  yield* sched.wait(35);
+  yield* formation('連なり', 7, { y: 390 });
+  yield* sched.wait(35);
+  yield* formation('連なり', 7, { y: MID, shoot: true });
+  yield* sched.waitCleared(20);
   yield* formation('挟み', 4, { shoot: true });
+  yield* sched.wait(50);
+  yield* formation('追い越し', 6, { ys: [80, 460, 150, 390, 230, 310], gap: 26 });
+  yield* sched.waitCleared(20);
+  yield* formation('Uターン', 5, { y: 130, dy: 160, carry: [0, 'way'] });
   yield* sched.wait(80);
-  yield* formation('追い越し', 4, { ys: [80, 460, 150, 390], gap: 30 });
-  yield* sched.waitCleared(30);
-  yield* formation('Uターン', 4, { y: 130, dy: 160, carry: [0, 'way'] });
-  yield* sched.wait(120);
-  yield* formation('Uターン', 4, { y: 420, dy: -160 });
-  yield* sched.waitCleared(30);
+  yield* formation('Uターン', 5, { y: 420, dy: -160 });
+  yield* sched.wait(60);
+  yield* formation('波', 8, { y0: MID, amp: 150 });
+  yield* sched.waitCleared(20);
 }
 
 export const SEGMENTS = [
