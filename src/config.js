@@ -43,6 +43,8 @@ export const CFG = {
     puni: { hp: 5,  r: 15, size: 48, speed: 2.6, score: 120 },
     moko: { hp: 50, r: 22, size: 80, speed: 2.4, score: 600, stay: 180, stopX: 780 },
     byun: { hp: 12, r: 13, size: 44, speed: 5.6, vy: 1.6, score: 240 },
+    // ゆがみ：壊れてから作られた小さなもの。編隊を組まず、不規則に揺れたり止まったりする
+    guni: { hp: 6, r: 14, size: 44, speed: 2.2, score: 150 },
     // 子機：母船の「ハイジョセヨ」で出てくる小さな兄弟機
     chibi: { hp: 2, r: 10, size: 30, speed: 2.8, score: 50, max: 10, count: [4, 5, 6] },
   },
@@ -73,7 +75,8 @@ export const CFG = {
 
   // 中ボス（面ごと）。倒すと母船の記録が出る
   midboss: { hp: [900, 1300, 1800], r: 44, x: 730, score: 10000,
-    partR: 24, partHp: 220, partScore: 1000, repairWait: 240 },   // 修理機の部品（壊しても付け直される）
+    partR: 24, partHp: 220, partScore: 1000, repairWait: 240,
+    teleWarn: 40 },                                               // 中ボス3の瞬間移動：残像を出してから跳ぶまで   // 修理機の部品（壊しても付け直される）
 
   bomb: { max: 6, invincible: 120, enemyDmg: 30, bossDmg: 80 },
   autoBomb: true,             // 被弾の瞬間、ボムが残っていれば自動で発動して打ち消す（既定ON）

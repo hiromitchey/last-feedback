@@ -111,11 +111,12 @@ export function render(debug) {
   }
   ctx.globalAlpha = 1;
   // 敵
-  const spr = { puni: S.puniSprite(), moko: S.mokoSprite(), byun: S.byunSprite(), chibi: S.puniSprite() };
+  const spr = { puni: S.puniSprite(), moko: S.mokoSprite(), byun: S.byunSprite(), chibi: S.puniSprite(), guni: S.guniSprite() };
   const chibiScale = CFG.enemy.chibi.size / CFG.enemy.puni.size;
   for (const e of state.enemies) {
     if (e.hitFlash) ctx.globalAlpha = 0.6;
-    blit(spr[e.type], e.x, e.y, e.type === 'byun' ? e.ang - Math.PI : 0, e.type === 'chibi' ? chibiScale : 1);
+    const rot = e.type === 'byun' ? e.ang - Math.PI : e.type === 'guni' ? e.wob.rot : 0;
+    blit(spr[e.type], e.x, e.y, rot, e.type === 'chibi' ? chibiScale : 1);
     // 船体番号（047 の前後。047 だけは無い）
     if (e.num) text(e.num, e.x + 2, e.y + e.r * 0.55, e.type === 'chibi' ? 7 : 10, '#fff', 'center', 'rgba(42,33,64,.8)', RETRO_FONT);
     ctx.globalAlpha = 1;
@@ -200,7 +201,15 @@ function drawMid() {
   if (m.dying) ctx.globalAlpha = Math.max(0, 1 - m.dying / 50);
   if (m.hitFlash) ctx.globalAlpha *= 0.75;
   const jx = m.dying ? (fxRng.rnd() - 0.5) * 6 : 0;
-  blit(S.midSprite(m.kind), m.x + jx, m.y);
+  // 瞬間移動の予告：移動先に残像
+  if (m.ghost) {
+    const a = ctx.globalAlpha;
+    ctx.globalAlpha = 0.25 + 0.2 * ((state.frame >> 2) & 1);   // 点滅
+    blit(S.midSprite(m.kind), m.x, m.ghost.y);
+    ctx.globalAlpha = a;
+  }
+  if (m.glitch > 0) drawGlitch(S.midSprite(m.kind), m.x + jx, m.y);
+  else blit(S.midSprite(m.kind), m.x + jx, m.y);
   // 部品（修理機）。付け直すたびに色が変わる
   for (const p of m.parts) {
     if (!p.dead) drawPlate(p.x + jx, p.y, PART_COLORS[p.col], p.hp / p.maxhp, p.hitFlash);
@@ -209,6 +218,15 @@ function drawMid() {
   }
   ctx.globalAlpha = 1;
   if (m.glow > 0) drawCharge({ x: m.x - 20, y: m.y, r: 36, glow: m.glow });
+}
+
+// ノイズ：絵を横の帯に切って、帯ごとに左右へずらす
+function drawGlitch(img, x, y) {
+  const n = 6, sh = img.height / n, lh = img.h / n;
+  for (let i = 0; i < n; i++) {
+    const dx = (fxRng.rnd() - 0.5) * 30;
+    ctx.drawImage(img, 0, i * sh, img.width, sh, x - img.w / 2 + dx, y - img.h / 2 + i * lh, img.w, lh);
+  }
 }
 
 // 部品の板：白フチ＋色＋ボルト＋砲口。HPでヒビ

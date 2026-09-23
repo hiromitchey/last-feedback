@@ -4,6 +4,7 @@ import { state, popup } from './world.js';
 import * as sched from './sched.js';
 import { spawnEnemy } from './enemies.js';
 import { bigOrb } from './bullets.js';
+import { gameRng } from './rng.js';
 import { bossFight, skipForm } from './boss.js';
 import { mission } from './story.js';
 import { midbossFight, midTargetable, damageMid } from './midboss.js';
@@ -98,6 +99,17 @@ export function* formation(kind, n, opt = {}) {
       yield* sched.wait(CFG.warn.spawn);
       for (let i = 0; i < n; i++)
         spawnEnemy('puni', X0 + i * 60, y0, { move: 'uturn', dy, carry: carryOf(i) });
+      break;
+    }
+    case 'ゆがみ': {
+      // 壊れたものの群れ：ばらばらの高さ・ばらばらの間隔で来る（揃っていないこと自体が見せ場）
+      for (let i = 0; i < n; i++) {
+        const y = 60 + gameRng.rnd() * (CFG.H - 120);
+        warn([y]);
+        yield* sched.wait(CFG.warn.spawn);
+        spawnEnemy('guni', X0, y, { move: 'guni', carry: carryOf(i) });
+        yield* sched.wait(10 + ((gameRng.rnd() * (opt.gap ?? 40)) | 0));
+      }
       break;
     }
     case '玉の雨':
@@ -202,6 +214,39 @@ function* road2b() {
   yield* sched.waitCleared(20);
 }
 
+// ---- 3面「応答なし」：歪んだものが大半。兄弟の揃った編隊はときどきだけ ----
+function* road3a() {
+  yield* sched.wait(40);
+  yield* formation('ゆがみ', 6, { gap: 50 });
+  yield* sched.waitCleared(20);
+  yield* formation('玉吐き', 2, { y: 170, shoot: true, carry: [0, 'pow'] });
+  yield* sched.wait(60);
+  yield* formation('ゆがみ', 8, { gap: 35 });
+  yield* sched.waitCleared(20);
+  yield* formation('連なり', 6, { y: MID, shoot: true });                 // 兄弟は揃ったまま
+  yield* sched.wait(30);
+  yield* formation('ゆがみ', 6, { gap: 30, carry: [5, 'way'] });
+  yield* sched.waitCleared(20);
+  yield* formation('玉吐き', 4, { y: 380, shoot: true, carry: [1, 'bomb'] });
+  yield* sched.wait(80);
+  yield* formation('ゆがみ', 10, { gap: 25 });
+  yield* sched.waitCleared(20);
+  yield* formation('玉の雨', 3, { ys: [110, MID, 430], gap: 40 });
+  yield* sched.wait(40);
+  yield* formation('ゆがみ', 8, { gap: 25 });
+  yield* sched.wait(60);
+  yield* formation('追い越し', 4, { ys: [80, 460, 200, 340], gap: 30 });
+  yield* sched.waitCleared(20);
+}
+
+function* road3b() {
+  yield* sched.wait(40);
+  yield* formation('ゆがみ', 10, { gap: 20 });
+  yield* sched.wait(40);
+  yield* formation('玉吐き', 2, { y: MID, shoot: true });
+  yield* sched.waitCleared(20);
+}
+
 // ---- 面の構成（物語に合わせた3面。PLAN.md） ----
 // part: { road, min, cap } 道中 / { mid } 中ボス / { boss } 母船
 export const STAGES = [
@@ -215,8 +260,11 @@ export const STAGES = [
     { mid: 2 },                                     // 修理機
     { road: road2b, min: 20 * 60, cap: 16 },
   ] },
-  { name: 'STAGE 3', title: '', planet: 1.3, parts: [
-    { boss: true },                                 // 道中・中ボス3 は次の作業で
+  { name: 'STAGE 3', title: '', planet: 1.35, parts: [
+    { road: road3a, min: 35 * 60, cap: 16 },
+    { mid: 3 },                                     // 原型をとどめないもの
+    { road: road3b, min: 15 * 60, cap: 16 },
+    { boss: true },
   ] },
 ];
 

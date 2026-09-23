@@ -291,6 +291,7 @@ export function midSprite(kind) {
   let c = cache.get(k);
   if (c) return c;
   if (kind === 2) { c = repairUnitSprite(); cache.set(k, c); return c; }
+  if (kind === 3) { c = shapelessSprite(); cache.set(k, c); return c; }
   const size = 130;
   c = mk(size, size, g => {
     const m = size / 2;
@@ -310,6 +311,67 @@ export function midSprite(kind) {
   });
   cache.set(k, c);
   return c;
+}
+
+// ゆがみ（小さな壊れたもの）：いびつで、色が合っていない。番号は無い
+export function guniSprite() {
+  const k = 'e|guni';
+  let c = cache.get(k);
+  if (c) return c;
+  const size = CFG.enemy.guni.size + 8, m = size / 2, R = size * 0.34;
+  c = mk(size, size, g => {
+    const rs = [1, 0.7, 1.15, 0.85, 1.05, 0.6, 1.1, 0.9];
+    g.beginPath();
+    rs.forEach((r, i) => {
+      const a = i / rs.length * Math.PI * 2 + 0.3, x = m + Math.cos(a) * R * r, y = m + Math.sin(a) * R * r;
+      i ? g.lineTo(x, y) : g.moveTo(x, y);
+    });
+    g.closePath();
+    g.lineJoin = 'round'; g.strokeStyle = '#fff'; g.lineWidth = 5; g.stroke();
+    g.fillStyle = '#6d5c8a'; g.fill();
+    g.fillStyle = '#a0875e'; g.fillRect(m + R * 0.1, m - R * 0.7, R * 0.6, R * 0.45);
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(m - R * 0.35, m + R * 0.05, R * 0.3, 0, 7); g.fill();
+    g.fillStyle = '#FF5C8A'; g.beginPath(); g.arc(m - R * 0.42, m + R * 0.05, R * 0.14, 0, 7); g.fill();
+  });
+  cache.set(k, c);
+  return c;
+}
+
+// 3：原型をとどめないもの。047型の翼、もこのレンズ、継ぎ当ての板が一つの塊にくっついている
+function shapelessSprite() {
+  const size = 170, m = size / 2, R = size * 0.34;
+  return mk(size, size, g => {
+    g.lineJoin = 'round';
+    // 突き出た 047 型の翼（あちこちの向き）
+    const wing = (x, y, rot, col) => {
+      g.save(); g.translate(m + x, m + y); g.rotate(rot);
+      g.beginPath(); g.moveTo(0, 0); g.lineTo(R * 0.9, -R * 0.25); g.lineTo(R * 0.75, R * 0.1); g.closePath();
+      g.strokeStyle = '#fff'; g.lineWidth = 5; g.stroke(); g.fillStyle = col; g.fill();
+      g.restore();
+    };
+    wing(10, -30, -2.2, '#d9d5e0'); wing(20, 30, 2.0, '#FF9E3D'); wing(-20, 20, 2.8, '#C7D34A'); wing(30, -10, -0.4, '#d9d5e0');
+    const rs = [1, 0.8, 1.2, 0.7, 1.1, 0.9, 1.25, 0.75, 1.05, 0.85];
+    g.beginPath();
+    rs.forEach((r, i) => {
+      const a = i / rs.length * Math.PI * 2, x = m + Math.cos(a) * R * r, y = m + Math.sin(a) * R * r * 0.9;
+      i ? g.lineTo(x, y) : g.moveTo(x, y);
+    });
+    g.closePath();
+    g.strokeStyle = '#fff'; g.lineWidth = 8; g.stroke();
+    g.fillStyle = '#5a4a70'; g.fill();
+    for (const [x, y, w, h, col, r] of [[5, -30, 40, 22, '#a0875e', 0.3], [-20, 18, 30, 26, '#5c6b7a', -0.4], [28, 22, 26, 18, '#8a6f9e', 0.6], [-30, -18, 22, 20, '#6d5c4a', 0.1]]) {
+      g.save(); g.translate(m + x, m + y); g.rotate(r); g.fillStyle = col; g.fillRect(-w / 2, -h / 2, w, h); g.restore();
+    }
+    // レンズがいくつも（数が合っていない）
+    for (const [x, y, r, col] of [[-0.45, -0.1, 0.26, '#FF5C8A'], [0.1, 0.35, 0.16, '#FFD54F'], [-0.1, -0.55, 0.12, '#4FC3F7']]) {
+      g.fillStyle = '#fff'; g.beginPath(); g.arc(m + x * R, m + y * R, r * R, 0, 7); g.fill();
+      g.fillStyle = col; g.beginPath(); g.arc(m + x * R - r * R * 0.2, m + y * R, r * R * 0.5, 0, 7); g.fill();
+    }
+    // はみ出した配線
+    g.lineCap = 'round'; g.lineWidth = 3;
+    g.strokeStyle = '#FFD54F'; g.beginPath(); g.moveTo(m + R * 0.8, m + R * 0.4); g.quadraticCurveTo(m + R * 1.3, m + R * 0.9, m + R * 1.0, m + R * 1.3); g.stroke();
+    g.strokeStyle = '#FF5C8A'; g.beginPath(); g.moveTo(m + R * 0.6, m - R * 0.7); g.quadraticCurveTo(m + R * 1.2, m - R * 1.1, m + R * 1.3, m - R * 0.6); g.stroke();
+  });
 }
 
 // 2：修理機（継ぎ接ぎの塊）。いびつな塊に、色の合わない板がいくつも貼られている
@@ -445,7 +507,7 @@ export function prebuild() {
   for (const k of ['way', 'pow', 'kakera', 'bomb']) itemSprite(k);
   mokoSprite(); byunSprite();
   for (let f = 1; f <= 3; f++) bossSprite(f);
-  midSprite(1); midSprite(2);
+  midSprite(1); midSprite(2); midSprite(3); guniSprite();
   for (const w of ['upper', 'lower']) for (let cr = 0; cr < 4; cr++) coreSprite(w, cr);
   watchFont();
   return cache.size;

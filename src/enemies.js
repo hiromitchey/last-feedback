@@ -24,7 +24,10 @@ export function spawnEnemy(type, x, y, opt = {}) {
     ty: opt.ty ?? 270, dy: opt.dy ?? 0, phaseN: 0,
     carry: opt.carry ?? null,
     // 正常な個体（ぷに・びゅん）には船体番号。壊れてから作られた もこ には無い
-    num: type === 'moko' ? null : nextHullNumber(),
+    num: type === 'moko' || type === 'guni' ? null : nextHullNumber(),
+    // ゆがみは1体ずつ動きがばらばら（揺れの周期・止まるタイミング）
+    wob: type === 'guni' ? { a1: gameRng.range(20, 60), f1: gameRng.range(0.02, 0.06), a2: gameRng.range(5, 20),
+      f2: gameRng.range(0.1, 0.2), p: gameRng.rnd() * 6, stopAt: 60 + ((gameRng.rnd() * 120) | 0), rot: 0 } : null,
   };
   state.enemies.push(e);
   if (opt.shoot && type === 'puni') sched.add(puniShot(e), e);
@@ -93,6 +96,15 @@ export function moveEnemies() {
           e.y = e.y0 + Math.sin(e.t * 0.05) * 10;
           if (--e.stayT <= 0) e.phaseN = 2;
         } else e.x += Math.min(3, (e.x - M.stopX) * 0.05 + 0.5);   // 右へ退出
+        break;
+      }
+      case 'guni': {
+        // 揃わない。揺れ方も速さもばらばら、ときどき止まる（兄弟の編隊と正反対）
+        const w = e.wob;
+        const stopped = e.t % 200 > w.stopAt && e.t % 200 < w.stopAt + 30;
+        if (!stopped) e.x += e.vx * (0.7 + 0.5 * Math.sin(e.t * 0.05 + w.p));
+        e.y = e.y0 + Math.sin(e.t * w.f1 + w.p) * w.a1 + Math.sin(e.t * w.f2) * w.a2;
+        w.rot = Math.sin(e.t * 0.09 + w.p) * 0.4;
         break;
       }
       case 'launch':

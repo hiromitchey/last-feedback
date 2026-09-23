@@ -6,6 +6,7 @@ import * as sched from './sched.js';
 import { needle, ring, fan, bigOrb, phrase } from './bullets.js';
 import { spawnItem } from './items.js';
 import { fxRng } from './rng.js';
+import { spawnEnemy } from './enemies.js';
 import { showLine } from './story.js';
 import { STORY, MID_TEXT } from './text.js';
 
@@ -83,8 +84,50 @@ function* partLower(p) {
   }
 }
 
+// 3：原型をとどめないもの。ときどきノイズが走って瞬間移動する（移動先に残像を先に出す＝予告）
+function* mid3(m) {
+  yield* sched.wait(40);
+  let k = 0;
+  while (true) {
+    yield* sched.charge(m);
+    say(m, COL.CYAN);
+    yield* sched.wait(40);
+    yield* sched.charge(m);
+    ring(m, 10, 1.9, COL.CYAN);
+    yield* sched.wait(50);
+    for (let i = 0; i < 2; i++) {
+      yield* sched.charge(m, 20);
+      needle(m, 3.0, COL.PINK, -0.15); needle(m, 3.0, COL.PINK, 0); needle(m, 3.0, COL.PINK, 0.15);
+      yield* sched.wait(40);
+    }
+    // 瞬間移動：残像 → ノイズ → 跳ぶ。跳んでいる間は撃たない
+    yield* teleport(m);
+    if (k++ % 2 === 0) bigOrb(m.x - 50, m.y, {});
+    yield* sched.charge(m);
+    say(m, COL.CYAN, 150);
+    yield* sched.wait(50);
+    // 歪んだ小さなものを吐き出す
+    for (let i = 0; i < 3; i++) {
+      spawnEnemy('guni', m.x - 40, m.y + (i - 1) * 50, { move: 'guni' });
+      yield* sched.wait(10);
+    }
+    yield* sched.wait(60);
+  }
+}
+function* teleport(m) {
+  const py = state.player.y;
+  const to = Math.max(110, Math.min(CFG.H - 110, py > CFG.H / 2 ? py - 170 : py + 170));
+  m.ghost = { y: to, t: CFG.midboss.teleWarn };
+  yield* sched.wait(CFG.midboss.teleWarn);
+  m.ghost = null;
+  m.glitch = 24;
+  m.homeY = to; m.y = to;
+  yield* sched.wait(30);
+}
+
 const KINDS = {
   1: { gen: mid1, frags: ['A0', 'A1'] },
+  3: { gen: mid3, frags: ['B1', 'B2', 'B3', 'B4'] },
   2: { gen: mid2, frags: ['A2', 'A3', 'B0'], parts: [
     { dx: -46, dy: -62, gen: partUpper }, { dx: -46, dy: 62, gen: partLower },
   ] },
@@ -169,9 +212,10 @@ export function moveMid() {
     if (m.dying % 8 === 0) crumble(m, 8);
     return;
   }
+  if (m.glitch > 0) m.glitch--;
   if (!m.entering) {
     const amp = m.sweep ? 150 : 40;
-    m.y += (CFG.H / 2 + Math.sin(m.t * (m.sweep ? 0.03 : 0.015)) * amp - m.y) * 0.05;
+    m.y += ((m.homeY ?? CFG.H / 2) + Math.sin(m.t * (m.sweep ? 0.03 : 0.015)) * amp - m.y) * 0.05;
   }
   syncMidParts(m);
   for (const p of m.parts) { if (p.hitFlash) p.hitFlash--; repairStep(m, p); }
@@ -200,6 +244,8 @@ export function damageMid(dmg) {
     m.hp = 0; m.dying = 1;
     if (m.atk) m.atk.alive = false;
     for (const p of m.parts) { if (p.atk) p.atk.alive = false; p.dead = true; p.fly = null; p.repairT = 0; }
+    m.ghost = null;
+    for (const e of state.enemies) if (e.type === 'guni' && m.kind === 3) e.alive = false;
     for (const b of state.eBullets) b.alive = false;
     for (const q of state.phrases) q.alive = false;
     state.score += CFG.midboss.score;
