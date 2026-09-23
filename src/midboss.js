@@ -3,11 +3,11 @@
 import { CFG, COL } from './config.js';
 import { state, spawnParticle } from './world.js';
 import * as sched from './sched.js';
-import { needle, ring, fan, bigOrb } from './bullets.js';
+import { needle, ring, fan, bigOrb, phrase } from './bullets.js';
 import { spawnItem } from './items.js';
 import { fxRng } from './rng.js';
 import { showLine } from './story.js';
-import { STORY } from './text.js';
+import { STORY, MID_TEXT } from './text.js';
 
 // ---- 中ボスごとの攻撃（普通の弾。声は母船だけ） ----
 // 1：少しだけ歪んだ試作品。047 に近い形。攻撃は素直
@@ -16,7 +16,11 @@ function* mid1(m) {
   while (true) {
     yield* sched.charge(m);
     for (let i = 0; i < 3; i++) { needle(m, 2.8, COL.PINK, (i - 1) * 0.12); yield* sched.wait(6); }
-    yield* sched.wait(70);
+    yield* sched.wait(50);
+    // 声：ﾊｲｼﾞｮ！ハイジョ！（自機の高さに流す）
+    yield* sched.charge(m);
+    say(m, COL.VIOLET);
+    yield* sched.wait(50);
     yield* sched.charge(m);
     ring(m, 8, 1.8, COL.VIOLET);
     yield* sched.wait(60);
@@ -28,8 +32,20 @@ function* mid1(m) {
     }
     m.sweep = 0;
     bigOrb(m.x - 50, m.y, {});                // でか玉（かけら・エネルギーの補給源）
-    yield* sched.wait(80);
+    yield* sched.wait(40);
+    yield* sched.charge(m);
+    say(m, COL.VIOLET, 140);                  // 2本目は間を空けて
+    yield* sched.wait(60);
   }
+}
+
+// 中ボスの声を1本流す。off を渡すと自機の高さから上下にずらす（逃げ道を残す）
+function say(m, col, off = 0) {
+  const list = MID_TEXT[m.kind];
+  m.sayIdx = (m.sayIdx ?? -1) + 1;
+  const py = state.player.y;
+  const y = off ? py + (py > CFG.H / 2 ? -off : off) : py;
+  phrase(m, list[m.sayIdx % list.length], { y: Math.max(60, Math.min(CFG.H - 60, y)), col, max: 2 });
 }
 
 const KINDS = {
@@ -90,6 +106,7 @@ export function damageMid(dmg) {
     m.hp = 0; m.dying = 1;
     if (m.atk) m.atk.alive = false;
     for (const b of state.eBullets) b.alive = false;
+    for (const q of state.phrases) q.alive = false;
     state.score += CFG.midboss.score;
     crumble(m, 40);
   }

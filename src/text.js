@@ -46,6 +46,11 @@ export const BOSS_TEXT = {
   },
 };
 
+// 中ボスの声：命令を受けた個体。半角と全角が混ざる（壊れかけている）
+export const MID_TEXT = {
+  1: ['ﾊｲｼﾞｮ！|{ハイジョ！}', '{{ハイジョ！}}', 'ﾊｲｼﾞｮ|ﾊｲｼﾞｮ|{ハイジョ！}', 'イジョウ|{{ハイジョ！}}', 'ﾊｲｼﾞｮ|{{ﾊｲｼﾞｮ！！}}'],
+};
+
 // 表記を「文字の並び」に。size は倍率、word は言葉の番号。rnd を渡すと印のない言葉の大きさがバラつく
 export function parsePhrase(str, rnd = null) {
   const out = [];
@@ -55,7 +60,8 @@ export function parsePhrase(str, rnd = null) {
     else if (w.startsWith('{') && w.endsWith('}')) { size = 1.7; big = true; t = w.slice(1, -1); }
     else if (w.startsWith('(') && w.endsWith(')')) { size = 0.7; t = w.slice(1, -1); }
     else if (rnd) size = 0.85 + rnd() * 0.45;
-    for (const ch of t) out.push({ ch, size, big, word: wi, space: ch === '　' || ch === ' ' });
+    for (const ch of t) out.push({ ch, size, big, word: wi, space: ch === '　' || ch === ' ',
+      half: /[｡-ﾟ !-~]/.test(ch) });   // 半角は幅が狭い
   });
   return out;
 }

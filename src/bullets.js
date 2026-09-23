@@ -99,7 +99,7 @@ export function phrase(src, text, opt = {}) {
   // 横に並べる。文字幅は大きさに比例、言葉の間に少し隙間
   let x = 0, prevWord = 0;
   for (const c of chars) {
-    const w = F.base * c.size * (c.space ? 0.5 : 0.95);
+    const w = F.base * c.size * (c.space ? 0.5 : c.half ? 0.55 : 0.95);
     if (c.word !== prevWord) { x += F.base * 0.25; prevWord = c.word; }
     c.dx = x + w / 2;
     c.px = Math.round(F.base * c.size);
