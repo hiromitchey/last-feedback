@@ -4,7 +4,7 @@ import { state, resetWorld, sweep, moveParticles, movePopups, moveBooms, moveSig
 import { input, initInput, sample, pressed, syncTarget, BTN } from './input.js';
 import * as sched from './sched.js';
 import { movePlayer, shoot, fireBomb } from './player.js';
-import { moveBoss } from './boss.js';
+import { moveBoss, skipForm } from './boss.js';
 import { moveMid } from './midboss.js';
 import { moveStory, resetHullNumbers, showLine } from './story.js';
 import { STORY } from './text.js';
@@ -74,6 +74,42 @@ function warpSpeed() {
   return 1 + 14 * Math.sin(Math.PI * Math.min(1, u));
 }
 
+// ---- デバッグ：場面ジャンプ。何度も周回せずに、見たい場面だけ確かめる ----
+// タイトルなどで数字キー、または URL に ?scene=名前 を付けて読み込む
+const SCENE_KEYS = {
+  Digit1: 'stage1', Digit2: 'stage2', Digit3: 'stage3',
+  Digit4: 'mid1', Digit5: 'mid2', Digit6: 'mid3',
+  Digit7: 'boss1', Digit8: 'boss2', Digit9: 'boss3',
+  Digit0: 'bossdie', Minus: 'ending', Equal: 'ruins',
+};
+// 場面ごとの強化（その時点の目安）
+const SCENE_LV = { 0: [0, 0], 1: [2, 1], 2: [3, 3] };
+function jumpTo(scene) {
+  startGame();
+  sched.clear();
+  state.mission = null;
+  const lv = (w, p) => { state.player.lv = { way: w, pow: p }; };
+  const m = /^(stage|mid|boss)(\d)$/.exec(scene);
+  if (m) {
+    const n = +m[2];
+    if (m[1] === 'stage') { lv(...SCENE_LV[n - 1]); startStage(n - 1, 0); }
+    if (m[1] === 'mid') { lv(...(n === 1 ? [2, 1] : n === 2 ? [3, 2] : [3, 3])); startStage(n - 1, 1); }
+    if (m[1] === 'boss') { lv(3, 3); startStage(2, 2, n); }
+  } else if (scene === 'bossdie') {
+    // 母船の形態3を出して、出きったらすぐ倒す
+    lv(3, 3); startStage(2, 2, 3);
+    sched.add((function* () {
+      yield* sched.waitUntil(() => state.boss && !state.boss.entering && state.boss.trans === 0);
+      skipForm();
+    })());
+  } else if (scene === 'ending' || scene === 'ruins') {
+    state.mode = 'ending'; state.endT = scene === 'ruins' ? 999 : 0;
+    if (scene === 'ruins') state.ruins = { t: 0 };
+    return;
+  }
+  state.mode = 'play';
+}
+
 function toTitle() {
   sched.clear();
   resetWorld();
@@ -108,7 +144,10 @@ function stepPlay() {
 function step() {
   state.frame++;
   sample();
-  if (DEBUG) while (input.fkeys.length) handleKey(input.fkeys.shift());
+  if (DEBUG) while (input.fkeys.length) {
+    const k = input.fkeys.shift();
+    if (SCENE_KEYS[k]) jumpTo(SCENE_KEYS[k]); else handleKey(k);
+  }
   else input.fkeys.length = 0;
   if (input.toggleAuto) { state.autoShot = !state.autoShot; input.toggleAuto = false; }
 
@@ -204,6 +243,12 @@ requestAnimationFrame(frame);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && state.mode === 'play') state.mode = 'pause';
 });
+
+// URL の ?scene=名前 で、読み込んだ瞬間にその場面へ（例：?scene=ruins）
+if (DEBUG) {
+  const sc = new URLSearchParams(location.search).get('scene');
+  if (sc) jumpTo(sc);
+}
 
 // デバッグ用にコンソールから触れるように
 // step は描画なしの早回し用（自動プレイでの通し確認）

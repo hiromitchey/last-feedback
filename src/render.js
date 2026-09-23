@@ -1,5 +1,5 @@
 // 描画パイプライン（技術設計書 9章）。論理座標は常に 960×540
-import { CFG, COL } from './config.js';
+import { CFG, COL, DEBUG } from './config.js';
 import { state, particles, planetXY } from './world.js';
 import { input, touchButtons } from './input.js';
 import * as S from './sprites.js';
@@ -586,6 +586,8 @@ function drawTitle() {
     'タッチ：ドラッグで移動・右下で撃つ　Q / AUTO：オートショット切替　F9：エネルギー切替（試験）',
   ];
   help.forEach((s, i) => text(s, CFG.W / 2, CFG.H - 70 + i * 26, 15, '#7d88a6', 'center', '#10152a'));
+  if (DEBUG) text('DEBUG 場面ジャンプ：1-3 面 / 4-6 中ボス / 7-9 母船の形態 / 0 母船撃破 / - 最後の一枚 / ^ 廃墟　（URL ?scene=ruins なども可）',
+    CFG.W / 2, 20, 12, '#5a6480', 'center', '#10152a');
 }
 
 function overlay(title, sub) {
