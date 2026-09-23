@@ -21,6 +21,7 @@ export const state = {
   laserWarns: [],           // レーザーの予告線
   popups: [],
   booms: [],                // 爆発（見た目だけ）
+  debris: [],               // 破片（見た目だけ）
   boss: null,
   seg: null,                // 道中の区間 { index, t, escaped }
   segCap: null,             // 区間ごとの同時弾上限
@@ -53,6 +54,7 @@ export function resetWorld() {
   state.laserWarns.length = 0;
   state.popups.length = 0;
   state.booms.length = 0;
+  state.debris.length = 0;
   state.boss = null;
   state.seg = null;
   state.segCap = null;
@@ -142,4 +144,25 @@ export function explode(x, y, size = 40) {
 
 export function moveBooms() {
   for (const b of state.booms) if (++b.t >= b.max) b.alive = false;
+  for (const d of state.debris) {
+    d.x += d.vx; d.y += d.vy; d.vx *= 0.985; d.vy = d.vy * 0.985 + 0.04; d.rot += d.vr;
+    if (++d.t >= d.max) d.alive = false;
+  }
+}
+
+// 破片：継ぎ当ての板が回転しながら飛び散る
+const DEBRIS_COLS = ['#a0875e', '#5c6b7a', '#8a6f9e', '#6d5c4a', '#d5d2dc', '#556070'];
+export function debris(x, y, n) {
+  for (let i = 0; i < n; i++) {
+    const a = fxRng.rnd() * Math.PI * 2, s = 2 + fxRng.rnd() * 6;
+    state.debris.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1, rot: fxRng.rnd() * 6, vr: (fxRng.rnd() - 0.5) * 0.3,
+      w: 10 + fxRng.rnd() * 22, h: 8 + fxRng.rnd() * 14, col: fxRng.pick(DEBRIS_COLS), t: 0, max: 80 + fxRng.rnd() * 60, alive: true });
+  }
+}
+
+// 煙：くすぶる
+export function smoke(x, y, n = 8) {
+  for (let i = 0; i < n; i++)
+    spawnParticle(x + fxRng.range(-20, 20), y + fxRng.range(-20, 20), fxRng.range(-0.4, 0.4), -0.4 - fxRng.rnd() * 0.8,
+      60 + fxRng.rnd() * 50, fxRng.pick(['#5a5566', '#6d6878', '#4a4656']), 6 + fxRng.rnd() * 8);
 }

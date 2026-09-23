@@ -121,6 +121,7 @@ function step() {
     movePopups();
     moveBooms();
     sweep(state.booms);
+    sweep(state.debris);
     moveStory();
     if (state.blackout) state.blackout.t++;
     sweep(state.popups);

@@ -129,6 +129,7 @@ export function render(debug) {
   }
   drawBoss();
   drawMid();
+  drawDebris();
   drawBooms();                  // 爆発はボスより手前
   // レーザー（弾より下）
   for (const w of state.laserWarns) {
@@ -226,6 +227,42 @@ function drawMid() {
   if (m.glow > 0) drawCharge({ x: m.x - 20, y: m.y, r: 36, glow: m.glow });
 }
 
+// 折れた母船：絵を左右半分に切り、それぞれ折れ目を中心に垂れ下がるように回す
+function drawSplit(img, cx, cy, ang, sep, drop) {
+  const sw = img.width / 2, w = img.w / 2, h = img.h;
+  ctx.save(); ctx.translate(cx - sep, cy + drop * 0.6); ctx.rotate(-ang);
+  ctx.drawImage(img, 0, 0, sw, img.height, -w, -h / 2, w, h);
+  ctx.restore();
+  ctx.save(); ctx.translate(cx + sep, cy + drop); ctx.rotate(ang);
+  ctx.drawImage(img, sw, 0, sw, img.height, 0, -h / 2, w, h);
+  ctx.restore();
+}
+function splitPoint(cx, cy, dx, dy, ang, sep, drop) {
+  const left = dx < 0, a = left ? -ang : ang, c = Math.cos(a), s = Math.sin(a);
+  return [cx + (left ? -sep : sep) + dx * c - dy * s, cy + (left ? drop * 0.6 : drop) + dx * s + dy * c];
+}
+// ヒビ：真ん中を縦に走るジグザグ
+function drawCrack(cx, cy, u) {
+  const pts = [[0, -120], [8, -80], [-6, -40], [10, 0], [-8, 40], [6, 80], [0, 120]];
+  const n = Math.max(2, Math.round(pts.length * u));
+  ctx.strokeStyle = '#1a1424'; ctx.lineWidth = 5; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  pts.slice(0, n).forEach(([x, y], i) => (i ? ctx.lineTo(cx + x, cy + y) : ctx.moveTo(cx + x, cy + y)));
+  ctx.stroke();
+  ctx.strokeStyle = '#FFD54F'; ctx.lineWidth = 1.5; ctx.stroke();
+}
+
+function drawDebris() {
+  for (const d of state.debris) {
+    ctx.globalAlpha = Math.min(1, (d.max - d.t) / 30);
+    ctx.save(); ctx.translate(d.x, d.y); ctx.rotate(d.rot);
+    ctx.fillStyle = '#fff'; ctx.fillRect(-d.w / 2 - 2, -d.h / 2 - 2, d.w + 4, d.h + 4);
+    ctx.fillStyle = d.col; ctx.fillRect(-d.w / 2, -d.h / 2, d.w, d.h);
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+}
+
 // 爆発：白い芯 → 黄色 → オレンジの火の玉が広がって消える。外側にリング
 function drawBooms() {
   for (const b of state.booms) {
@@ -278,12 +315,16 @@ function drawBoss() {
   if (b.dying) ctx.globalAlpha = 0.4 + 0.6 * lit / LIGHTS;
   const jit = 0;
   if (b.hitFlash) ctx.globalAlpha *= 0.75;
-  blit(S.bossSprite(b.drawForm ?? b.form), b.x + jit + 20, b.y);
+  const img = S.bossSprite(b.drawForm ?? b.form);
+  if (b.snap) drawSplit(img, b.x + 20, b.y, b.snap.ang, b.snap.sep, b.snap.drop);
+  else blit(img, b.x + jit + 20, b.y);
   ctx.globalAlpha = 1;
-  // 灯（窓・スラスター・腕の先）。撃破後、ひとつずつ消える
+  if (b.crack && !b.snap) drawCrack(b.x + 20, b.y, b.crack / 30);
+  // 灯（窓・スラスター・腕の先）。撃破後、ひとつずつ消える。折れたら半分ごとに付いていく
   BOSS_LIGHTS.forEach(([dx, dy, col], i) => {
     if (i >= lit) return;
-    const x = b.x + jit + 20 + dx, y = b.y + dy;
+    let x = b.x + jit + 20 + dx, y = b.y + dy;
+    if (b.snap) [x, y] = splitPoint(b.x + 20, b.y, dx, dy, b.snap.ang, b.snap.sep, b.snap.drop);
     ctx.globalAlpha = 0.35 + 0.15 * Math.sin(state.frame * 0.1 + i);
     ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, 9, 0, 7); ctx.fill();
     ctx.globalAlpha = 1;
@@ -528,7 +569,9 @@ function drawEnding() {
   ctx.fillStyle = '#07080f'; ctx.beginPath(); ctx.arc(840, 200, 160, 0, 7); ctx.fill();
   // 止まった母船。継ぎ接ぎだらけ
   ctx.globalAlpha = 0.55;
-  blit(S.bossSprite(3), 640, 330, -0.12, 1.05);
+  ctx.save(); ctx.translate(640, 330); ctx.rotate(-0.1); ctx.translate(-640, -330);
+  drawSplit(S.bossSprite(3), 640, 330, 0.28, 26, 46);
+  ctx.restore();
   ctx.globalAlpha = 1;
   // 残骸：動かない船。番号が読める
   const wrecks = [[470, 110, 0.5], [860, 440, 2.4], [330, 470, -0.8], [560, 500, 1.2]];

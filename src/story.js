@@ -4,7 +4,7 @@ import { CFG } from './config.js';
 import { state } from './world.js';
 import * as sched from './sched.js';
 import { STORY } from './text.js';
-import { explode, flash } from './world.js';
+import { explode, flash, debris, smoke } from './world.js';
 import { fxRng } from './rng.js';
 
 const TYPE = 4;       // タイプライター：1文字あたりのフレーム
@@ -115,16 +115,29 @@ export const LIGHTS = 6;
 export function* afterBoss(b) {
   state.quiet = true;                        // 自機も撃たない。ずっと定型だった画面が、最後に黙る
   b.lights = LIGHTS;
-  // 爆発：船体のあちこちで連鎖 → 大爆発。そのあと焼け残った船体が黙る
-  for (let i = 0; i < 14; i++) {
-    explode(b.x + 20 + fxRng.range(-110, 110), b.y + fxRng.range(-110, 110), 40 + fxRng.rnd() * 40);
-    if (i % 4 === 3) flash('#fff', 6);
-    yield* sched.wait(8 + ((fxRng.rnd() * 8) | 0));
+  // 1. 連鎖爆発（派手に）。継ぎ当ての板が飛び散る
+  for (let i = 0; i < 24; i++) {
+    const big = i % 5 === 4;
+    const x = b.x + 20 + fxRng.range(-120, 120), y = b.y + fxRng.range(-120, 120);
+    explode(x, y, big ? 90 + fxRng.rnd() * 40 : 40 + fxRng.rnd() * 40);
+    debris(x, y, big ? 5 : 2);
+    if (i % 3 === 2) flash('#fff', 5);
+    yield* sched.wait(5 + ((fxRng.rnd() * 7) | 0));
   }
-  yield* sched.wait(20);
-  explode(b.x + 20, b.y, 160);
-  flash('#fff', 40);
+  // 2. 大爆発を2段
+  yield* sched.wait(15);
+  explode(b.x + 20, b.y, 200); debris(b.x + 20, b.y, 12); flash('#fff', 30); state.shake = 30;
+  yield* sched.wait(14);
+  explode(b.x - 30, b.y + 20, 150); flash('#fff', 20);
   b.burnt = true;
+  // 3. おさまる（くすぶる）
+  for (let i = 0; i < 5; i++) { smoke(b.x + 20 + fxRng.range(-60, 60), b.y + fxRng.range(-40, 40)); yield* sched.wait(20); }
+  // 4. ボキッ：真ん中にヒビが走る → 間 → 真っ二つに折れて、前後がゆっくり垂れ下がる
+  b.crack = 1;
+  state.shake = 5;
+  yield* sched.wait(45);
+  b.snap = { t: 0 };
+  explode(b.x + 20, b.y, 80); debris(b.x + 20, b.y, 8); flash('#fff', 8); state.shake = 22;
   yield* sched.wait(80);
   while (b.lights > 0) { b.lights--; yield* sched.wait(40); }
   yield* sched.wait(90);                     // 静かになる

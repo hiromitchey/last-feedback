@@ -338,6 +338,7 @@ function startDying(b) {
   b.dying = 1;
   b.weakenRate = 1;
   b.repair = null; b.drawForm = b.form; b.trans = 0;   // 直している途中でも打ち切る
+  b.glow = 0; for (const p of b.parts) p.glow = 0;      // 撃つ途中で倒れても予告を残さない
   if (b.body) b.body.alive = false;
   for (const p of b.parts) p.dead = true;
   clearDanger();
@@ -351,6 +352,11 @@ function startDying(b) {
 // 撃破後は動かない。灯を消していくのは story.js の afterBoss
 function dyingStep(b) {
   b.dying++;
+  if (b.crack && b.crack < 30) b.crack++;          // ヒビが伸びる
+  if (b.snap) {
+    const u = Math.min(1, ++b.snap.t / 90), e = 1 - (1 - u) ** 3;
+    b.snap.ang = e * 0.28; b.snap.sep = e * 26; b.snap.drop = e * 46;
+  }
 }
 
 function boom(x, y, n, sp) {

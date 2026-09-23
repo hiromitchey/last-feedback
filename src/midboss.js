@@ -242,7 +242,7 @@ export function damageMid(dmg) {
   m.hp -= dmg; m.hitFlash = 3;
   state.score += CFG.score.hit;
   if (m.hp <= 0) {
-    m.hp = 0; m.dying = 1;
+    m.hp = 0; m.dying = 1; m.glow = 0;
     if (m.atk) m.atk.alive = false;
     for (const p of m.parts) { if (p.atk) p.atk.alive = false; p.dead = true; p.fly = null; p.repairT = 0; }
     m.ghost = null;
