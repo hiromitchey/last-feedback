@@ -90,7 +90,7 @@ export function orbSprite(r, hueIdx, crack) {
 }
 export const ORB_HUES = HUES;
 
-// ---- 自機（右向き）：グレードごとに色違い。絵のスロット player1〜4 のフォールバック ----
+// ---- 自機（右向き）：ワイドの段階ごとに色違い。絵のスロット player1〜4 のフォールバック ----
 function shipPath(g, s) {
   // 原点中心、右向き。s = 半径相当
   g.beginPath();
@@ -149,6 +149,58 @@ export function puniSprite() {
   return c;
 }
 
+// びゅん（左向き・高速）。ぷにと同じ正常個体。色で分ける。進行方向に回すので水平で描く
+export function byunSprite() {
+  const k = 'e|byun';
+  let c = cache.get(k);
+  if (c) return c;
+  const size = CFG.enemy.byun.size + 8;
+  c = mk(size, size, g => {
+    g.save(); g.translate(size / 2, size / 2); g.scale(1, 0.72); g.translate(-size / 2, -size / 2);
+    drawShip(g, size, '#C7D34A', '#2d4a3a', -1);
+    g.restore();
+  });
+  cache.set(k, c);
+  return c;
+}
+
+// もこ（左向き）。物語：壊れてから作られたもの。歪んでいて、組み上がりきっていない
+export function mokoSprite() {
+  const k = 'e|moko';
+  let c = cache.get(k);
+  if (c) return c;
+  const size = CFG.enemy.moko.size + 12, m = size / 2, R = size * 0.4;
+  c = mk(size, size, g => {
+    // 左右非対称のいびつな輪郭
+    const n = 11, rs = [1, 0.86, 1.05, 0.8, 0.97, 1.08, 0.78, 0.95, 1.02, 0.84, 0.93];
+    g.beginPath();
+    for (let i = 0; i <= n; i++) {
+      const a = i / n * Math.PI * 2, r = R * rs[i % n];
+      const x = m + Math.cos(a) * r, y = m + Math.sin(a) * r * 0.9;
+      i ? g.lineTo(x, y) : g.moveTo(x, y);
+    }
+    g.closePath();
+    g.lineJoin = 'round';
+    g.strokeStyle = '#fff'; g.lineWidth = 7; g.stroke();
+    g.fillStyle = '#7a5aa8'; g.fill();
+    // 継ぎ当て（色の合わない板）
+    g.fillStyle = '#a0875e'; g.fillRect(m + R * 0.05, m - R * 0.6, R * 0.5, R * 0.34);
+    g.fillStyle = '#5c6b7a'; g.fillRect(m - R * 0.7, m + R * 0.2, R * 0.45, R * 0.3);
+    // ボルト
+    g.fillStyle = '#e6e0ff';
+    for (const [x, y] of [[0.15, -0.55], [0.5, -0.55], [-0.62, 0.28], [-0.3, 0.45]])
+      { g.beginPath(); g.arc(m + x * R, m + y * R, 2.2, 0, 7); g.fill(); }
+    // 片目だけの大きなレンズ（左向き）
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(m - R * 0.35, m - R * 0.12, R * 0.3, 0, 7); g.fill();
+    g.fillStyle = '#FF5C8A'; g.beginPath(); g.arc(m - R * 0.42, m - R * 0.12, R * 0.16, 0, 7); g.fill();
+    // はみ出した配線
+    g.strokeStyle = '#FFD54F'; g.lineWidth = 2.5; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(m + R * 0.7, m + R * 0.3); g.quadraticCurveTo(m + R * 1.1, m + R * 0.5, m + R * 0.95, m + R * 0.85); g.stroke();
+  });
+  cache.set(k, c);
+  return c;
+}
+
 // ---- アイテム ----
 export function itemSprite(kind) {
   const k = 'i|' + kind;
@@ -162,11 +214,11 @@ export function itemSprite(kind) {
       g.fillStyle = COL.YELLOW; g.fill();
       return;
     }
-    const col = kind === 'power' ? '#5BD66B' : COL.ORANGE;
+    const col = { way: '#3FA7F5', pow: '#F0503C', bomb: COL.ORANGE }[kind];
     g.fillStyle = '#fff'; roundRect(g, 1, 1, 26, 26, 8); g.fill();
     g.fillStyle = col;    roundRect(g, 4, 4, 20, 20, 6); g.fill();
     g.fillStyle = '#fff'; g.font = 'bold 15px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText(kind === 'power' ? 'P' : 'B', 14, 15);
+    g.fillText({ way: 'W', pow: 'P', bomb: 'B' }[kind], 14, 15);
   });
   cache.set(k, c);
   return c;
@@ -186,6 +238,7 @@ export function prebuild() {
     for (let h = 0; h < HUES; h++) for (let cr = 0; cr < 4; cr++) orbSprite(r, h, cr);
   for (let g = 0; g < 4; g++) playerSprite(g);
   puniSprite();
-  for (const k of ['power', 'kakera', 'bomb']) itemSprite(k);
+  for (const k of ['way', 'pow', 'kakera', 'bomb']) itemSprite(k);
+  mokoSprite(); byunSprite();
   return cache.size;
 }

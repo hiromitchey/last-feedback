@@ -2,7 +2,7 @@
 import { CFG } from './config.js';
 import { state } from './world.js';
 
-// kind: 'power' | 'kakera' | 'bomb'
+// kind: 'way' | 'pow' | 'kakera' | 'bomb'
 export function spawnItem(kind, x, y, vx = 0, vy = 0) {
   state.items.push({ kind, x, y, vx, vy, t: 0, alive: true });
 }

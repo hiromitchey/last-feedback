@@ -108,6 +108,7 @@ export function initInput(canvas) {
 
   addEventListener('keydown', e => {
     if (/^F\d+$/.test(e.code)) { e.preventDefault(); if (!e.repeat) input.fkeys.push(e.code); return; }
+    if (e.code === 'Period') input.fkeys.push('Period');   // コマ送り（F5 中）
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
     if (!e.repeat && (e.code === 'KeyZ' || e.code === 'Space' || e.code === 'Enter')) input.tapped = true;
     if (!e.repeat && e.code === 'KeyQ') input.toggleAuto = true;

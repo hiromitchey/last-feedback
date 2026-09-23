@@ -16,8 +16,12 @@ export const state = {
   pBullets: [],
   items: [],
   warnings: [],             // 出現予告の「▶」
+  lasers: [],               // 水平レーザー
+  laserWarns: [],           // レーザーの予告線
   popups: [],
   boss: null,
+  seg: null,                // 道中の区間 { index, t, escaped }
+  segCap: null,             // 区間ごとの同時弾上限
 };
 
 let idSeq = 1;
@@ -31,7 +35,9 @@ export function resetWorld() {
   state.flash = null;
   state.shake = 0;
   state.player = {
-    x: P.startX, y: P.startY, grade: 0, power: 0,
+    x: P.startX, y: P.startY,
+    lv: { way: 0, pow: 0 },      // ワイド（弾の数）とパワー（1発のダメージ）の段階 0〜3
+    stock: { way: 0, pow: 0 },   // 次の段階までに拾った数
     invincible: 0, shotCd: 0, lives: state.diff.lives, bombs: state.diff.bombs,
     dead: false, gradeFx: 0,
     energy: CFG.energy.max, empty: false, idle: 0,
@@ -41,8 +47,12 @@ export function resetWorld() {
   state.pBullets.length = 0;
   state.items.length = 0;
   state.warnings.length = 0;
+  state.lasers.length = 0;
+  state.laserWarns.length = 0;
   state.popups.length = 0;
   state.boss = null;
+  state.seg = null;
+  state.segCap = null;
   for (const p of particles) p.alive = false;
 }
 

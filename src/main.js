@@ -4,10 +4,10 @@ import { state, resetWorld, sweep, moveParticles, movePopups } from './world.js'
 import { input, initInput, sample, pressed, syncTarget, BTN } from './input.js';
 import * as sched from './sched.js';
 import { movePlayer, shoot } from './player.js';
-import { moveBullets } from './bullets.js';
+import { moveBullets, moveLasers } from './bullets.js';
 import { moveEnemies } from './enemies.js';
 import { moveItems } from './items.js';
-import { moveWarnings, demoStage } from './formation.js';
+import { moveWarnings, startStage } from './formation.js';
 import { collide } from './collide.js';
 import { initRender, render } from './render.js';
 import { prebuild } from './sprites.js';
@@ -22,7 +22,7 @@ resetWorld();
 function startGame() {
   resetWorld();
   sched.clear();
-  sched.add(demoStage());
+  startStage(0);
   syncTarget(state.player.x, state.player.y);
   state.mode = 'play';
 }
@@ -35,12 +35,15 @@ function stepPlay() {
   moveEnemies();
   moveItems();
   moveWarnings();
+  moveLasers();
   collide();                    // 撃破が先、被弾が後
   sweep(state.enemies);
   sweep(state.eBullets);
   sweep(state.pBullets);
   sweep(state.items);
   sweep(state.warnings);
+  sweep(state.lasers);
+  sweep(state.laserWarns);
   state.scroll += CFG.scroll;
 }
 
@@ -87,6 +90,12 @@ function frame(now) {
   acc += dt;
   let steps = 0;
   const t0 = performance.now();
+  if (dbg.stepMode) {
+    // F5 コマ送り：「.」を押した分だけ進める
+    acc = 0;
+    if (dbg.stepOnce > 0) { dbg.stepOnce--; step(); steps = 1; }
+    else { sample(); while (input.fkeys.length) handleKey(input.fkeys.shift()); }
+  }
   while (acc >= CFG.STEP && steps < 4) {
     step();
     acc -= CFG.STEP;
@@ -109,4 +118,5 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // デバッグ用にコンソールから触れるように
-if (DEBUG) window.__pop = { state, CFG, input, startGame };
+// step は描画なしの早回し用（自動プレイでの通し確認）
+if (DEBUG) window.__pop = { state, CFG, input, startGame, step };

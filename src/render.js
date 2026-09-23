@@ -1,5 +1,5 @@
 // 描画パイプライン（技術設計書 9章）。論理座標は常に 960×540
-import { CFG, COL, GRADE_COL } from './config.js';
+import { CFG, COL } from './config.js';
 import { state, particles } from './world.js';
 import { input, touchButtons } from './input.js';
 import * as S from './sprites.js';
@@ -100,12 +100,28 @@ export function render(debug) {
   }
   ctx.globalAlpha = 1;
   // 敵
-  const puni = S.puniSprite();
+  const spr = { puni: S.puniSprite(), moko: S.mokoSprite(), byun: S.byunSprite() };
   for (const e of state.enemies) {
     if (e.hitFlash) ctx.globalAlpha = 0.6;
-    blit(puni, e.x, e.y);
+    blit(spr[e.type], e.x, e.y, e.type === 'byun' ? e.ang - Math.PI : 0);
     ctx.globalAlpha = 1;
+    // アイテムを持っている個体には目印（倒すと落とす）
+    if (e.carry) blit(S.itemSprite(e.carry), e.x + e.r * 0.6, e.y - e.r - 8, 0, 0.62);
     if (e.glow > 0) drawCharge(e);
+  }
+  // レーザー（弾より下）
+  for (const w of state.laserWarns) {
+    ctx.globalAlpha = 0.35 + 0.35 * ((w.t >> 3) & 1);
+    ctx.strokeStyle = COL.YELLOW; ctx.lineWidth = 2; ctx.setLineDash([14, 10]);
+    ctx.beginPath(); ctx.moveTo(0, w.y); ctx.lineTo(CFG.W, w.y); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  ctx.globalAlpha = 1;
+  for (const l of state.lasers) {
+    if (l.w <= 0) continue;
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, l.y - l.w / 2 - 3, CFG.W, l.w + 6);
+    ctx.fillStyle = COL.YELLOW; ctx.fillRect(0, l.y - l.w / 2, CFG.W, l.w);
+    ctx.fillStyle = 'rgba(255,255,255,.8)'; ctx.fillRect(0, l.y - l.w * 0.12, CFG.W, l.w * 0.24);
   }
   // 敵弾（でか玉以外）
   for (const b of state.eBullets) {
@@ -160,12 +176,12 @@ function drawPlayer() {
   if (p.gradeFx > 0) {
     const t = 1 - p.gradeFx / 40;
     ctx.globalAlpha = 1 - t;
-    ctx.strokeStyle = GRADE_COL[p.grade]; ctx.lineWidth = 6;
+    ctx.strokeStyle = p.gradeFxCol || '#fff'; ctx.lineWidth = 6;
     ctx.beginPath(); ctx.arc(p.x, p.y, 20 + t * 120, 0, 7); ctx.stroke();
     ctx.globalAlpha = 1;
   }
   const blink = p.invincible > 0 && (p.invincible >> 2) & 1;
-  if (!blink) blit(S.playerSprite(p.grade), p.x, p.y);
+  if (!blink) blit(S.playerSprite(p.lv.way), p.x, p.y);
   // 判定円：薄いリングで常時表示
   ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.arc(p.x, p.y, CFG.player.r, 0, 7); ctx.stroke();
@@ -209,19 +225,24 @@ function drawHUD() {
   text('SCORE ' + String(Math.floor(state.score)).padStart(7, '0'), 110, 24, 18, '#fff', 'left');
   const hearts = p.lives >= 0 ? '♥'.repeat(Math.min(p.lives, 9)) : '';
   text(hearts, 340, 24, 18, COL.PINK, 'left');
-  // グレードとパワーのゲージ
-  const gx = 22, gy = CFG.H - 26;
-  text('G' + (p.grade + 1), gx, gy, 20, GRADE_COL[p.grade], 'left');
-  if (p.grade < CFG.grade.length - 1) {
-    const need = CFG.gradeCost[p.grade];
-    for (let i = 0; i < need; i++) {
-      ctx.fillStyle = '#fff'; ctx.fillRect(gx + 44 + i * 18, gy - 7, 14, 14);
-      ctx.fillStyle = i < p.power ? '#5BD66B' : '#2a2140';
-      ctx.fillRect(gx + 46 + i * 18, gy - 5, 10, 10);
-    }
-  } else {
-    text('MAX', gx + 44, gy, 16, '#fff', 'left');
-  }
+  // ワイド（W）とパワー（P）の段階。四角は次の段階までに拾った数
+  const row = (label, kind, col, gy, sub) => {
+    const gx = 22, lv = p.lv[kind];
+    text(label + (lv + 1), gx, gy, 18, col, 'left');
+    if (lv < 3) {
+      const need = CFG.lvCost[lv];
+      for (let i = 0; i < need; i++) {
+        ctx.fillStyle = '#fff'; ctx.fillRect(gx + 40 + i * 18, gy - 7, 14, 14);
+        ctx.fillStyle = i < p.stock[kind] ? col : '#2a2140';
+        ctx.fillRect(gx + 42 + i * 18, gy - 5, 10, 10);
+      }
+      text(sub, gx + 46 + need * 18, gy, 13, '#cfd6ff', 'left');
+    } else text('MAX ' + sub, gx + 40, gy, 13, '#fff', 'left');
+  };
+  const S2 = CFG.shot;
+  row('W', 'way', '#3FA7F5', CFG.H - 50, S2.ways[p.lv.way] + 'way');
+  row('P', 'pow', '#F0503C', CFG.H - 24, '×' + S2.powMul[p.lv.pow].toFixed(1) + (p.lv.pow >= S2.pierceAt ? ' 貫通' : ''));
+  if (state.seg) text(state.seg.name, CFG.W / 2, 24, 16, '#cfd6ff');
   if (state.autoShot) text('AUTO', CFG.W - 20, 24, 14, COL.AQUA, 'right');
 }
 

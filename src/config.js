@@ -12,14 +12,17 @@ export const CFG = {
     touchOffsetY: 60,
     size: 56,
   },
-  grade: [
-    { ways: 1, dmg: 2.0, pierce: false, spread: 0 },
-    { ways: 3, dmg: 1.8, pierce: false, spread: 0.14 },
-    { ways: 5, dmg: 1.6, pierce: false, spread: 0.14 },
-    { ways: 7, dmg: 1.6, pierce: true,  spread: 0.14 },
-  ],
-  gradeCost: [2, 3, 4],
-  scatterOnHit: 1,            // 被弾時にばら撒くパワー（設計書は4。ぬるいので1に。PLAN.md）
+  // 強化は2系統（設計書の「グレード4段」から変更。PLAN.md）
+  //   ワイド W：弾の数が増える   パワー P：1発のダメージが上がる。最大で貫通
+  shot: {
+    ways:    [1, 3, 5, 7],
+    baseDmg: [2.0, 1.8, 1.6, 1.6],   // way数ごとの1発の基本ダメージ（増えるほど1発は軽く）
+    powMul:  [1.0, 1.3, 1.6, 2.0],   // パワー段階ごとの倍率
+    pierceAt: 3,                     // パワーがこの段階で貫通
+    spread: 0.14,
+  },
+  lvCost: [1, 2, 2],          // 次の段階に上がるのに要る個数（両系統共通）
+  scatterOnHit: 1,            // 被弾時に落とすアイテム（設計書は4。ぬるいので1に。PLAN.md）
 
   // 【試験】ショットのエネルギー。撃つと減り、撃たないと回復する。F9 でオン・オフ
   energy: {
@@ -38,9 +41,18 @@ export const CFG = {
 
   enemy: {
     puni: { hp: 5,  r: 15, size: 48, speed: 2.6, score: 120 },
-    moko: { hp: 50, r: 22, size: 80, score: 600 },
-    byun: { hp: 12, r: 13, size: 44, score: 240 },
+    moko: { hp: 50, r: 22, size: 80, speed: 2.4, score: 600, stay: 180, stopX: 780 },
+    byun: { hp: 12, r: 13, size: 44, speed: 5.6, vy: 1.6, score: 240 },
   },
+
+  // 道中2区間。切り替えは「全滅」かつ「最低時間の経過」
+  seg: {
+    minFrames: 45 * 60,
+    cap: [10, 16],            // 区間ごとの同時弾上限（道中A / 道中B）
+    zeroMissBonus: 3000,
+  },
+
+  laser: { warn: 80, fire: 40, width: 36, minGap: 80 },
   orb: { hpMid: 8, hpBoss: 20, rMid: 14, rBoss: 18, speed: 1.4, slowSpeed: 1.2, kakera: 3, kakeraBoss: 5 },
 
   item: { r: 10, pickR: 30, drift: 1.2, life: 60 * 12 },

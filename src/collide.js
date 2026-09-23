@@ -2,7 +2,7 @@
 import { CFG } from './config.js';
 import { state, spawnParticle, popup } from './world.js';
 import { damageEnemy } from './enemies.js';
-import { damagePlayer, gainPower } from './player.js';
+import { damagePlayer, gainLevel } from './player.js';
 import { scatter } from './items.js';
 import { fxRng } from './rng.js';
 
@@ -44,7 +44,8 @@ function breakOrb(o) {
   o.alive = false;
   state.score += CFG.score.orb;
   scatter('kakera', o.boss ? CFG.orb.kakeraBoss : CFG.orb.kakera, o.x, o.y, 1.6, 3.2);
-  if (o.boss) scatter('power', 1, o.x, o.y, 0, 2, 0);
+  // ボスのでか玉は強化アイテムも1個。低い方の系統を落として立て直しやすくする
+  if (o.boss) { const lv = state.player.lv; scatter(lv.pow < lv.way ? 'pow' : 'way', 1, o.x, o.y, 0, 2, 0); }
   for (let i = 0; i < 30; i++) {
     const a = fxRng.rnd() * Math.PI * 2, s = 2 + fxRng.rnd() * 5;
     spawnParticle(o.x, o.y, Math.cos(a) * s, Math.sin(a) * s, 20 + fxRng.rnd() * 25,
@@ -83,6 +84,11 @@ export function collide() {
     if (hit(b, p, b.r, CFG.player.r)) { damagePlayer(); break; }
   }
 
+  // 2b. 水平レーザー → 自機（横断する帯なので高さの差だけ見る）
+  for (const l of state.lasers) {
+    if (l.w > 4 && Math.abs(p.y - l.y) < l.w * 0.34 + CFG.player.r) { damagePlayer(); break; }
+  }
+
   // 3. 敵本体 → 自機（道中の主脅威）
   for (const e of state.enemies) {
     if (!e.alive) continue;
@@ -96,9 +102,9 @@ export function collide() {
     checks++;
     if (!hit(it, p, CFG.item.r, CFG.item.pickR)) continue;
     it.alive = false;
-    if (it.kind === 'power') {
+    if (it.kind === 'way' || it.kind === 'pow') {
       state.score += CFG.score.item;
-      gainPower();
+      gainLevel(it.kind);
     } else if (it.kind === 'kakera') {
       state.score += CFG.score.kakera;
       popup('+' + CFG.score.kakera, it.x, it.y - 12, { size: 14, col: '#fff', life: 24 });
