@@ -526,10 +526,10 @@ export function planetSprite() {
       g.ellipse(m + (rnd() - 0.5) * R * 1.6, m + (rnd() - 0.5) * R * 1.6, R * (0.2 + rnd() * 0.3), R * 0.05, -0.3, 0, 7);
       g.fill();
     }
-    // 街：昼側の大陸に灰色の街並み
-    g.fillStyle = 'rgba(170,170,160,.55)';
-    for (const [cx, cy] of [[-0.4, -0.25], [-0.25, -0.1], [0.35, -0.05], [0.45, -0.2], [-0.1, 0.35], [0.0, 0.25]]) {
-      for (let i = 0; i < 7; i++) g.fillRect(m + (cx + (rnd() - 0.5) * 0.14) * R, m + (cy + (rnd() - 0.5) * 0.1) * R, 3 + rnd() * 4, 2 + rnd() * 3);
+    // 街：昼側の大陸に、よく見れば分かる程度の灰色の点
+    g.fillStyle = 'rgba(170,170,160,.3)';
+    for (const [cx, cy] of [[-0.4, -0.25], [-0.25, -0.1], [-0.1, 0.35]]) {
+      for (let i = 0; i < 5; i++) g.fillRect(m + (cx + (rnd() - 0.5) * 0.1) * R, m + (cy + (rnd() - 0.5) * 0.08) * R, 1.5 + rnd() * 2, 1.5 + rnd() * 1.5);
     }
     // 夜側：右下がすっぽり暗い。都市の灯りは、ひとつも無い
     const night = g.createLinearGradient(m - R * 0.1, m - R * 0.3, m + R * 0.7, m + R * 0.5);
@@ -537,15 +537,6 @@ export function planetSprite() {
     night.addColorStop(0.35, 'rgba(6,8,18,.85)');
     night.addColorStop(1, 'rgba(6,8,18,.97)');
     g.fillStyle = night; g.fillRect(0, 0, d, d);
-    // 夜側の街の影：道路網のような灰色の線だけがうっすら見える。灯りは無い
-    g.strokeStyle = 'rgba(120,125,145,.35)'; g.lineWidth = 1;
-    for (const [cx, cy] of [[0.35, 0.3], [0.55, 0.05], [0.15, 0.6], [0.6, 0.45]]) {
-      const x0 = m + cx * R, y0 = m + cy * R;
-      for (let i = 0; i < 5; i++) {
-        g.beginPath(); g.moveTo(x0 - 14, y0 - 8 + i * 4); g.lineTo(x0 + 14, y0 - 10 + i * 4 + rnd() * 3); g.stroke();
-        g.beginPath(); g.moveTo(x0 - 10 + i * 5, y0 - 12); g.lineTo(x0 - 8 + i * 5, y0 + 10); g.stroke();
-      }
-    }
     g.restore();
     // 昼側の縁の光
     g.strokeStyle = 'rgba(170,220,255,.8)'; g.lineWidth = 2.5;
