@@ -53,7 +53,7 @@ export function resetWorld() {
   state.boss = null;
   state.seg = null;
   state.segCap = null;
-  state.checkpoint = null;   // コンティニューで戻る場所 { seg: 0|1|'boss', form, lv, cores }
+  state.checkpoint = null;   // コンティニューで戻る場所 { stage, part, lv, boss?, form?, cores? }
   state.bossWarn = 0;
   state.bombFx = 0;
   state.bossResult = null;
@@ -63,6 +63,10 @@ export function resetWorld() {
   state.mission = null;
   state.quiet = false;       // 撃破後：自機も撃たない
   state.blackout = null;
+  state.mid = null;          // 中ボス
+  state.slowT = 0;           // 中ボス撃破のスロー
+  state.stage = 0;           // 面（0〜2）
+  state.planet = 0.8;        // 奥の惑星の大きさ。面が進むほど近づく
   for (const p of particles) p.alive = false;
 }
 

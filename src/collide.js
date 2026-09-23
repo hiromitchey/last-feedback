@@ -3,6 +3,7 @@ import { CFG } from './config.js';
 import { state, spawnParticle, popup } from './world.js';
 import { damageEnemy } from './enemies.js';
 import { bossTargetable, damagePart, damageBoss } from './boss.js';
+import { midTargetable, damageMid } from './midboss.js';
 import { damagePlayer, gainLevel } from './player.js';
 import { scatter } from './items.js';
 import { onOrbBroken } from './story.js';
@@ -76,6 +77,13 @@ function hitBoss(b) {
   return false;
 }
 
+function hitMid(b) {
+  if (!midTargetable()) return false;
+  checks++;
+  if (hit(b, state.mid, PB_R, state.mid.r) && consume(b, state.mid)) { damageMid(b.dmg); return !b.alive; }
+  return false;
+}
+
 function hitEnemies(b) {
   for (const e of state.enemies) {
     if (!e.alive) continue;
@@ -96,6 +104,7 @@ export function collide() {
     if (!b.alive) continue;
     if (hitOrbs(b)) continue;
     if (hitBoss(b)) continue;
+    if (hitMid(b)) continue;
     hitEnemies(b);
   }
 

@@ -30,6 +30,8 @@ export function sim({ inv = false, energy = false, frames = 60 * 300, route = 'b
     if (p.bombs < lastBombs) log.push(at() + ' BOMB');
     lastBombs = p.bombs;
     if (s.boss && s.boss.form !== lastForm) { log.push(at() + ' 形態' + s.boss.form); lastForm = s.boss.form; }
+    if (s.mid && s.mid.t === 1) log.push(at() + ' 中ボス' + s.mid.kind);
+    if (s.mid && s.mid.dying === 1) log.push(at() + ' 中ボス撃破');
     const line = s.logLine && s.logLine.parts.join('|');
     if (line && line !== lastLine) log.push(at() + ' 「' + line + '」');
     lastLine = line;
@@ -41,6 +43,7 @@ export function sim({ inv = false, energy = false, frames = 60 * 300, route = 'b
       ty = route === 'core' && alive.length ? alive[0].y : s.boss.y;
       tx = 380;
     }
+    if (s.mid && !s.mid.entering && !s.mid.dying) { ty = s.mid.y; tx = 300; }
     const tgt = [...s.enemies.filter(e => e.x > p.x + 40), ...s.eBullets.filter(b => b.hp && b.x > p.x)].sort((a, b) => a.x - b.x)[0];
     if (tgt && (!s.boss || (tgt.hp && Math.abs(tgt.x - p.x) < 300))) ty = tgt.y;
     const it = s.items.find(i => i.x < 700 && i.x > 40);

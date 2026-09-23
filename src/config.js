@@ -67,6 +67,9 @@ export const CFG = {
     timeBonus: { full: 20000, within: 90, perSec: 200 },
   },
 
+  // 中ボス（面ごと）。倒すと母船の記録が出る
+  midboss: { hp: [900, 1300, 1800], r: 44, x: 730, score: 10000 },
+
   bomb: { max: 6, invincible: 120, enemyDmg: 30, bossDmg: 80 },
   autoBomb: true,             // 被弾の瞬間、ボムが残っていれば自動で発動して打ち消す（既定ON）
   continueCount: 10,          // CONTINUE? のカウント（秒）

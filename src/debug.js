@@ -57,7 +57,7 @@ export function tickFps(now) {
 
 export function drawDebug() {
   if (!dbg.stats) return;
-  const seg = state.seg ? `${state.seg.name} ${((state.frame - state.seg.t0) / 60).toFixed(1)}s 漏れ${state.seg.escaped}` : '-';
+  const seg = state.seg ? `${state.seg.name}-${state.seg.part} ${((state.frame - state.seg.t0) / 60).toFixed(1)}s 漏れ${state.seg.escaped}` : '-';
   drawStats([
     `fps ${dbg.fps.toFixed(1)}   step ${dbg.stepMs.toFixed(2)}ms   render ${dbg.renderMs.toFixed(2)}ms`,
     `bullets ${bulletWeight()}/${bulletCap()}   enemies ${state.enemies.length}   particles ${particleCount()}/512`,

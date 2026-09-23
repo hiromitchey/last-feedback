@@ -53,10 +53,11 @@ function drawBackground() {
   ctx.fillStyle = '#171a2e';
   ctx.fillRect(0, 0, CFG.W, CFG.H);
   // 惑星（ずっと奥に見えている。夜側に灯りがひとつも無い）
-  const px = 780 - (state.scroll * 0.02) % 40;
-  ctx.fillStyle = '#23304a'; ctx.beginPath(); ctx.arc(px, 110, 86, 0, 7); ctx.fill();
-  ctx.fillStyle = '#2d3d5c'; ctx.beginPath(); ctx.arc(px - 22, 96, 70, 0, 7); ctx.fill();
-  ctx.fillStyle = '#171a2e'; ctx.beginPath(); ctx.arc(px + 40, 124, 72, 0, 7); ctx.fill();
+  // 面が進むほど大きく見える（近づいている）
+  const px = 780 - (state.scroll * 0.02) % 40, k = state.planet ?? 1;
+  ctx.fillStyle = '#23304a'; ctx.beginPath(); ctx.arc(px, 110, 86 * k, 0, 7); ctx.fill();
+  ctx.fillStyle = '#2d3d5c'; ctx.beginPath(); ctx.arc(px - 22 * k, 96, 70 * k, 0, 7); ctx.fill();
+  ctx.fillStyle = '#171a2e'; ctx.beginPath(); ctx.arc(px + 40 * k, 110 + 14 * k, 72 * k, 0, 7); ctx.fill();
   for (const L of layers) {
     ctx.fillStyle = `rgba(200,210,255,${L.a})`;
     const off = (state.scroll * L.speed) % 1920;
@@ -121,6 +122,7 @@ export function render(debug) {
     if (e.glow > 0) drawCharge(e);
   }
   drawBoss();
+  drawMid();
   // レーザー（弾より下）
   for (const w of state.laserWarns) {
     ctx.globalAlpha = 0.35 + 0.35 * ((w.t >> 3) & 1);
@@ -187,6 +189,18 @@ export function render(debug) {
     const n = Math.max(0, Math.ceil(state.contT / 60) - 1);
     overlay('CONTINUE?', n + '　　クリック / タップ / Z でつづける');
   }
+}
+
+function drawMid() {
+  const m = state.mid;
+  if (!m) return;
+  // 崩れていくときは薄く、少しずつずれる
+  if (m.dying) ctx.globalAlpha = Math.max(0, 1 - m.dying / 50);
+  if (m.hitFlash) ctx.globalAlpha *= 0.75;
+  const jx = m.dying ? (fxRng.rnd() - 0.5) * 6 : 0;
+  blit(S.midSprite(m.kind), m.x + jx, m.y);
+  ctx.globalAlpha = 1;
+  if (m.glow > 0) drawCharge({ x: m.x - 20, y: m.y, r: 36, glow: m.glow });
 }
 
 function drawBoss() {
@@ -312,6 +326,13 @@ function drawHUD() {
   if (state.autoShot) text('AUTO', CFG.W - 20, 24, 14, COL.AQUA, 'right');
   text('B×' + p.bombs, 200, CFG.H - 37, 18, '#FF9E3D', 'left');
   // ボスの体力（形態の区切り付き）とコア
+  const md = state.mid;
+  if (md && !md.entering) {
+    const x = 300, y = 52, w = 360, h = 10;
+    ctx.fillStyle = '#fff'; ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
+    ctx.fillStyle = '#2a2140'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#8d8398'; ctx.fillRect(x, y, w * Math.max(0, md.hp) / md.maxhp, h);
+  }
   const b = state.boss;
   if (b && !b.entering) {
     const x = 300, y = 52, w = 360, h = 10;

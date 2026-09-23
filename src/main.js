@@ -5,6 +5,7 @@ import { input, initInput, sample, pressed, syncTarget, BTN } from './input.js';
 import * as sched from './sched.js';
 import { movePlayer, shoot, fireBomb } from './player.js';
 import { moveBoss } from './boss.js';
+import { moveMid } from './midboss.js';
 import { moveStory, resetHullNumbers } from './story.js';
 import { moveBullets, moveLasers, movePhrases } from './bullets.js';
 import { moveEnemies } from './enemies.js';
@@ -26,17 +27,19 @@ function startGame() {
   resetWorld();
   resetHullNumbers();
   sched.clear();
-  startStage(0, 1, null, true);   // 最初だけミッション表示
+  startStage(0, 0, 1, null, true);   // 最初だけミッション表示
   syncTarget(state.player.x, state.player.y);
   state.mode = 'play';
 }
 
 // コンティニュー：回数制限なし。死んだ区間の頭から（ボス戦なら形態の頭から）。スコアはリセット
 function doContinue() {
-  const cp = state.checkpoint || { seg: 0, lv: { way: 0, pow: 0 } };
+  const cp = state.checkpoint || { stage: 0, part: 0, lv: { way: 0, pow: 0 } };
   for (const a of [state.enemies, state.eBullets, state.pBullets, state.items, state.warnings, state.phrases, state.laserWarns]) a.length = 0;
   state.boss = null;
+  state.mid = null;
   state.bossWarn = 0;
+  state.slowT = 0;
   state.logLine = null; state.logQueue.length = 0;
   sched.clear();
   const p = state.player;
@@ -44,9 +47,9 @@ function doContinue() {
   p.invincible = 120; p.energy = CFG.energy.max; p.empty = false;
   p.lv = { ...cp.lv }; p.stock = { way: 0, pow: 0 };
   // ボス戦で力尽きたら強化は最低でも W3/P3 で復帰（設計書：G3で復帰）
-  if (cp.seg === 'boss') { p.lv.way = Math.max(p.lv.way, 2); p.lv.pow = Math.max(p.lv.pow, 2); }
+  if (cp.boss) { p.lv.way = Math.max(p.lv.way, 2); p.lv.pow = Math.max(p.lv.pow, 2); }
   state.score = 0;
-  startStage(cp.seg, cp.form ?? 1, cp.cores ?? null);
+  startStage(cp.stage, cp.part, cp.form ?? 1, cp.cores ?? null);
   state.mode = 'play';
 }
 
@@ -68,6 +71,7 @@ function stepPlay() {
   moveLasers();
   movePhrases();
   moveBoss();
+  moveMid();
   collide();                    // 撃破が先、被弾が後
   sweep(state.enemies);
   sweep(state.eBullets);
@@ -92,6 +96,8 @@ function step() {
       break;
     case 'play':
       if (pressed(BTN.PAUSE)) { state.mode = 'pause'; break; }
+      // 中ボス撃破の直後はスロー（3フレームに1回だけ進める）
+      if (state.slowT > 0 && (state.slowT-- % 3)) break;
       stepPlay();
       break;
     case 'pause':

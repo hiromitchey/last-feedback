@@ -7,6 +7,7 @@ import { fxRng } from './rng.js';
 import { damageEnemy } from './enemies.js';
 import { breakOrb } from './collide.js';
 import { bombBoss } from './boss.js';
+import { midTargetable, damageMid } from './midboss.js';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
@@ -123,6 +124,7 @@ export function fireBomb(auto = false) {
   if (state.boss) state.boss.pendingLaser = null;
   for (const e of state.enemies) if (e.alive && e.x < CFG.W + 10) damageEnemy(e, BM.enemyDmg);
   bombBoss(BM.bossDmg);
+  if (midTargetable()) damageMid(BM.bossDmg);
   flash('#fff', 20);
   state.shake = 10;
   state.bombFx = 40;

@@ -83,6 +83,8 @@ function* laserLoop(b, count, period) {
   while (true) {
     const c = count === 2 && b.weakenRate >= 1.6 ? 1 : count;   // 45秒続いたら1本に
     yield* laserWarn(b, c);
+    // ボムで予告線が消されたら、そのビームは撃たない（予告なしのビームを出さない。原則3）
+    if (!b.pendingLaser) { yield* sched.wait(period - CFG.laser.warn); continue; }
     const list = T.beam[b.form];
     hLaser(b, list[(b.beamIdx = (b.beamIdx ?? -1) + 1) % list.length]);
     yield* sched.wait(period - CFG.laser.warn);
@@ -126,14 +128,13 @@ function startForm(b) {
   }
   // チェックポイント：この形態の頭から再開できる
   state.checkpoint = {
-    seg: 'boss', form: b.form, lv: { ...state.player.lv },
+    ...state.checkpoint, boss: true, form: b.form, lv: { ...state.player.lv },
     cores: b.parts.map(p => ({ hp: p.hp, dead: p.dead })),
   };
 }
 
 // ---- ボス戦の流れ（stage から yield* で呼ぶ） ----
 export function* bossFight(form = 1, cores = null) {
-  state.seg = { index: 2, name: 'ボス', t0: state.frame, escaped: 0 };
   state.segCap = B().cap[form - 1];
   // 警告 → 右から大きくスライドイン
   state.bossWarn = 100;

@@ -284,6 +284,33 @@ export function bossSprite(form) {
   return c;
 }
 
+// ---- 中ボス（左向き）：壊れてから生まれた歪んだもの。面を追うごとに歪む ----
+// 1：少しだけ歪んだ試作品。047 に近い形。でも、どこかが合っていない
+export function midSprite(kind) {
+  const k = 'mid|' + kind;
+  let c = cache.get(k);
+  if (c) return c;
+  const size = 130;
+  c = mk(size, size, g => {
+    const m = size / 2;
+    drawShip(g, size, '#d9d5e0', '#FF5C8A', -1);          // 窓の色が違う
+    // 片側だけ曲がったヒレ
+    g.save(); g.translate(m, m); g.lineJoin = 'round';
+    g.beginPath(); g.moveTo(size * 0.2, size * 0.18); g.lineTo(size * 0.42, size * 0.42); g.lineTo(size * 0.3, size * 0.44); g.closePath();
+    g.strokeStyle = '#fff'; g.lineWidth = 5; g.stroke(); g.fillStyle = '#9c95a8'; g.fill();
+    // 合っていない板
+    g.fillStyle = '#a0875e'; g.fillRect(-size * 0.02, -size * 0.2, size * 0.2, size * 0.1);
+    g.fillStyle = '#e6e0ff';
+    for (const [x, y] of [[0.0, -0.18], [0.16, -0.18], [0.0, -0.12], [0.16, -0.12]]) { g.beginPath(); g.arc(x * size + 2, y * size + 2, 1.8, 0, 7); g.fill(); }
+    // ヒビ
+    g.strokeStyle = '#2a2140'; g.lineWidth = 2; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(-size * 0.15, size * 0.02); g.lineTo(-size * 0.05, size * 0.1); g.lineTo(size * 0.05, size * 0.06); g.stroke();
+    g.restore();
+  });
+  cache.set(k, c);
+  return c;
+}
+
 // コア（部位）：白フチ + 原色 + 中心の光。HPでヒビ
 export function coreSprite(which, crack) {
   const k = 'core|' + which + '|' + crack;
@@ -383,6 +410,7 @@ export function prebuild() {
   for (const k of ['way', 'pow', 'kakera', 'bomb']) itemSprite(k);
   mokoSprite(); byunSprite();
   for (let f = 1; f <= 3; f++) bossSprite(f);
+  midSprite(1);
   for (const w of ['upper', 'lower']) for (let cr = 0; cr < 4; cr++) coreSprite(w, cr);
   watchFont();
   return cache.size;
