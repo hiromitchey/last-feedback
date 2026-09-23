@@ -3,9 +3,9 @@
 import { CFG, COL } from './config.js';
 import { state, popup, flash, spawnParticle } from './world.js';
 import * as sched from './sched.js';
-import { needle, ring, fan, bigOrb, laserWarn, hLaser } from './bullets.js';
+import { needle, fan, bigOrb, laserWarn, hLaser, phrase } from './bullets.js';
 import { spawnItem } from './items.js';
-import { fxRng } from './rng.js';
+import { fxRng, gameRng } from './rng.js';
 import { BOSS_TEXT as T } from './text.js';
 import { afterBoss } from './story.js';
 
@@ -40,8 +40,8 @@ function* upperCore(p) {
   yield* sched.wait(40);
   while (true) {
     yield* sched.charge(p);
-    needle(p, 2.8, COL.PINK, -0.1, T.upperCore);
-    needle(p, 2.8, COL.PINK, 0.1, T.upperCore);
+    needle(p, 2.8, COL.PINK, -0.1);
+    needle(p, 2.8, COL.PINK, 0.1);
     yield* sched.wait(90);
   }
 }
@@ -50,24 +50,31 @@ function* lowerCore(p) {
   yield* sched.wait(100);
   while (true) {
     yield* sched.charge(p);
-    fan(p, 4, 'aim', 1.2, 2.0, COL.CYAN, T.lowerCore);
+    fan(p, 4, 'aim', 1.2, 2.0, COL.CYAN);
     yield* sched.wait(90);
   }
 }
 
 // ---- 本体の攻撃（形態ごと） ----
-function* form1Body(b) {
-  yield* sched.wait(70);
+// 声：言葉のかたまりを波に乗せて流す。1本目は自機の高さ、2本目以降は間を空けて上下どちらかに
+// （上下に逃げ道を残す。原則5）
+function* voiceLoop(b, count, period, col, max) {
+  yield* sched.wait(60);
+  const list = T.voice[b.form];
+  let idx = 0;
   while (true) {
     yield* sched.charge(b);
-    ring(b, 8, 1.8, COL.VIOLET, null, T.ring[1]);
-    yield* sched.wait(140);
-  }
-}
-function* ringLoop(b, n, sp, col, period) {
-  while (true) {
-    yield* sched.charge(b);
-    ring(b, n, sp, col, null, T.ring[b.form]);
+    const py = state.player.y;
+    const ys = [py];
+    for (let i = 1; i < count; i++) {
+      const up = py > CFG.H / 2 ? -1 : 1;
+      ys.push(py + up * (150 + i * 40) * (gameRng.rnd() < 0.2 ? -1 : 1));
+    }
+    ys.forEach((y, i) => {
+      const yc = Math.max(60, Math.min(CFG.H - 60, y));
+      phrase(b, list[idx % list.length], { y: yc, col, ph: gameRng.rnd() * 6, max });
+      idx++;
+    });
     yield* sched.wait(period - CFG.warn.shot);
   }
 }
@@ -94,7 +101,7 @@ function* needleLoop(b, period) {
   yield* sched.wait(30);
   while (true) {
     yield* sched.charge(b, 20);
-    needle(b, 3.2, COL.PINK, 0, T.needle);
+    needle(b, 3.2, COL.PINK);
     yield* sched.wait(period - 20);
   }
 }
@@ -104,14 +111,14 @@ function startForm(b) {
   b.body = { alive: true };
   const o = b.body;
   state.segCap = B().cap[b.form - 1];
-  if (b.form === 1) sched.add(form1Body(b), o);
+  if (b.form === 1) sched.add(voiceLoop(b, 1, 170, COL.VIOLET, 2), o);
   if (b.form === 2) {
-    sched.add(ringLoop(b, 10, 1.9, COL.CYAN, 110), o);
+    sched.add(voiceLoop(b, 2, 170, COL.CYAN, 3), o);
     sched.add(laserLoop(b, 1, 240), o);
     sched.add(orbLoop(b, 2, 300), o);
   }
   if (b.form === 3) {
-    sched.add(ringLoop(b, 10, 1.9, COL.CYAN, 100), o);
+    sched.add(voiceLoop(b, 2, 150, COL.CYAN, 4), o);
     sched.add(needleLoop(b, 60), o);
     sched.add(laserLoop(b, 2, 260), o);
     sched.add(orbLoop(b, 3, 280), o);
@@ -145,9 +152,9 @@ export function* bossFight(form = 1, cores = null) {
 }
 
 export function moveBoss() {
+  if (state.bossWarn > 0) state.bossWarn--;   // ボスが出る前から減らす
   const b = state.boss;
   if (!b) return;
-  if (state.bossWarn > 0) state.bossWarn--;
   b.t++;
   if (b.hitFlash) b.hitFlash--;
   for (const p of b.parts) if (p.hitFlash) p.hitFlash--;
@@ -190,7 +197,7 @@ export function damageBoss(dmg) {
 
 function clearDanger() {
   for (const x of state.eBullets) x.alive = false;
-  for (const l of state.lasers) l.alive = false;
+  for (const q of state.phrases) q.alive = false;
   for (const w of state.laserWarns) w.alive = false;
   if (state.boss) state.boss.pendingLaser = null;
 }

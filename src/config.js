@@ -52,9 +52,10 @@ export const CFG = {
     zeroMissBonus: 3000,
   },
 
-  // ビーム：予告80fのあと、文字の列が横一直線に飛んでくる
-  laser: { warn: 80, width: 36, minGap: 80, speed: 11, spacing: 24, r: 8 },
-  textBullet: { r: 7 },        // 文字の弾の判定半径（文字は約22px。判定は絵より小さく）
+  // ビーム：予告80fのあと、ボスの声が予告線の高さをまっすぐ速く飛んでくる
+  laser: { warn: 80, fire: 150, width: 44, minGap: 80, textSpeed: 4 },
+  // ボスの声（言葉のかたまり）。base は標準の文字の大きさ(px)、判定は文字の大きさ×hitRatio
+  phrase: { base: 24, speed: 1.9, amp: 42, wavelength: 360, hitRatio: 0.3, max: 3 },
 
   boss: {
     // 体力は設計書の約2.2倍。強化2系統（W/P）の最大火力が設計書の G4 の約2倍になるため（PLAN.md）

@@ -4,7 +4,6 @@ import { state, particles } from './world.js';
 import { input, touchButtons } from './input.js';
 import * as S from './sprites.js';
 import { fxRng } from './rng.js';
-import { beamX } from './bullets.js';
 import { lineProgress, LIGHTS } from './story.js';
 import { RETRO_FONT, STORY } from './text.js';
 
@@ -15,7 +14,7 @@ const BOSS_LIGHTS = [
 ];
 
 export let cv, ctx;
-const FONT = '"Hiragino Maru Gothic ProN","BIZ UDPGothic","Meiryo",sans-serif';
+// 画面の文字はすべてドット風フォント（UIも）
 
 export function initRender(canvas) {
   cv = canvas;
@@ -78,7 +77,7 @@ function blit(img, x, y, rot = 0, scale = 1) {
 }
 
 function text(str, x, y, size, col, align = 'center', outline = '#2a2140', font = null) {
-  ctx.font = font ? `${size}px ${font}` : `bold ${size}px ${FONT}`;
+  ctx.font = `${size}px ${font || RETRO_FONT}`;
   ctx.textAlign = align; ctx.textBaseline = 'middle';
   ctx.lineJoin = 'round';
   ctx.lineWidth = Math.max(3, size * 0.22); ctx.strokeStyle = outline;
@@ -130,19 +129,24 @@ export function render(debug) {
     ctx.setLineDash([]);
   }
   ctx.globalAlpha = 1;
-  // 文字のビーム：横一直線に飛んでくる文字列
-  for (const l of state.lasers) {
-    for (let i = 0; i < l.chars.length; i++) {
-      const x = beamX(l, i), ch = l.chars[i];
-      if (x < -20 || x > CFG.W + 20 || ch === '　' || ch === ' ') continue;
-      blit(S.glyphSprite(ch, COL.YELLOW), x, l.y);
+  // ボスの声・ビーム：言葉のかたまり。強調は大きく反転、言葉ごとに傾き、出てくるときに弾む
+  for (const q of state.phrases) {
+    if (q.beam) {
+      if (q.w <= 0) continue;
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, q.y0 - q.w / 2 - 3, q.srcX, q.w + 6);
+      ctx.fillStyle = 'rgba(255,213,79,.55)'; ctx.fillRect(0, q.y0 - q.w / 2, q.srcX, q.w);
+    }
+    const s = q.beam ? Math.min(1, q.w / CFG.laser.width) : 1;
+    for (const c of q.chars) {
+      if (c.space || c.sc <= 0 || c.x < -40 || c.x > CFG.W + 40) continue;
+      if (q.beam && c.x > q.srcX) continue;   // ボスの口より後ろは出さない
+      blit(S.glyphSprite(c.ch, q.beam ? '#FF9E3D' : q.col, c.px, c.big), c.x, c.y, c.rot, c.sc * s);
     }
   }
   // 敵弾（でか玉以外）
   for (const b of state.eBullets) {
     if (b.hp) continue;
-    if (b.ch) blit(S.glyphSprite(b.ch, b.col), b.x, b.y);
-    else if (b.needle) blit(S.needleSprite(b.col), b.x, b.y, Math.atan2(b.vy, b.vx));
+    if (b.needle) blit(S.needleSprite(b.col), b.x, b.y, Math.atan2(b.vy, b.vx));
     else blit(S.bulletSprite(b.col, 5.5), b.x, b.y);
   }
   // でか玉（弾の中で一番上）
@@ -286,7 +290,7 @@ function drawHUD() {
   text('047', 22, 24, 18, '#fff', 'left');
   text('SCORE ' + String(Math.floor(state.score)).padStart(7, '0'), 110, 24, 18, '#fff', 'left');
   const hearts = p.lives >= 0 ? '♥'.repeat(Math.min(p.lives, 9)) : '';
-  text(hearts, 340, 24, 18, COL.PINK, 'left');
+  text(hearts, 330, 24, 16, COL.PINK, 'left');
   // ワイド（W）とパワー（P）の段階。四角は次の段階までに拾った数
   const row = (label, kind, col, gy, sub) => {
     const gx = 22, lv = p.lv[kind];
@@ -304,7 +308,7 @@ function drawHUD() {
   const S2 = CFG.shot;
   row('W', 'way', '#3FA7F5', CFG.H - 50, S2.ways[p.lv.way] + 'way');
   row('P', 'pow', '#F0503C', CFG.H - 24, '×' + S2.powMul[p.lv.pow].toFixed(1) + (p.lv.pow >= S2.pierceAt ? ' 貫通' : ''));
-  if (state.seg) text(state.seg.name, CFG.W / 2, 24, 16, '#cfd6ff');
+  if (state.seg) text(state.seg.name, 620, 24, 16, '#cfd6ff');
   if (state.autoShot) text('AUTO', CFG.W - 20, 24, 14, COL.AQUA, 'right');
   text('B×' + p.bombs, 200, CFG.H - 37, 18, '#FF9E3D', 'left');
   // ボスの体力（形態の区切り付き）とコア
@@ -365,7 +369,10 @@ function drawHitboxes() {
   circle(state.player.x, state.player.y, CFG.player.r, '#0ff');
   const b = state.boss;
   if (b) { circle(b.x, b.y, b.r, '#f0f'); for (const p of b.parts) if (!p.dead) circle(p.x, p.y, p.r, '#f0f'); }
-  for (const l of state.lasers) for (let i = 0; i < l.chars.length; i++) circle(beamX(l, i), l.y, CFG.laser.r, '#ff0');
+  for (const q of state.phrases) {
+    if (q.beam) { ctx.strokeStyle = '#ff0'; ctx.strokeRect(0, q.y0 - q.w * 0.34, CFG.W, q.w * 0.68); continue; }
+    for (const c of q.chars) if (!c.space) circle(c.x, c.y, c.r * c.sc, '#ff0');
+  }
   ctx.strokeStyle = 'rgba(255,255,255,.3)';
   ctx.beginPath(); ctx.moveTo(CFG.player.xMax, 0); ctx.lineTo(CFG.player.xMax, CFG.H); ctx.stroke();
 }

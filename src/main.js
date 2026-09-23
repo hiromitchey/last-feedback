@@ -5,8 +5,8 @@ import { input, initInput, sample, pressed, syncTarget, BTN } from './input.js';
 import * as sched from './sched.js';
 import { movePlayer, shoot, fireBomb } from './player.js';
 import { moveBoss } from './boss.js';
-import { moveStory } from './story.js';
-import { moveBullets, moveLasers } from './bullets.js';
+import { moveStory, resetHullNumbers } from './story.js';
+import { moveBullets, moveLasers, movePhrases } from './bullets.js';
 import { moveEnemies } from './enemies.js';
 import { moveItems } from './items.js';
 import { moveWarnings, startStage } from './formation.js';
@@ -14,6 +14,7 @@ import { collide } from './collide.js';
 import { initRender, render } from './render.js';
 import { prebuild } from './sprites.js';
 import { dbg, handleKey, tickFps, drawDebug } from './debug.js';
+import { sim } from './autoplay.js';
 
 const cv = document.getElementById('cv');
 initRender(cv);
@@ -23,6 +24,7 @@ resetWorld();
 
 function startGame() {
   resetWorld();
+  resetHullNumbers();
   sched.clear();
   startStage(0, 1, null, true);   // 最初だけミッション表示
   syncTarget(state.player.x, state.player.y);
@@ -32,7 +34,7 @@ function startGame() {
 // コンティニュー：回数制限なし。死んだ区間の頭から（ボス戦なら形態の頭から）。スコアはリセット
 function doContinue() {
   const cp = state.checkpoint || { seg: 0, lv: { way: 0, pow: 0 } };
-  for (const a of [state.enemies, state.eBullets, state.pBullets, state.items, state.warnings, state.lasers, state.laserWarns]) a.length = 0;
+  for (const a of [state.enemies, state.eBullets, state.pBullets, state.items, state.warnings, state.phrases, state.laserWarns]) a.length = 0;
   state.boss = null;
   state.bossWarn = 0;
   state.logLine = null; state.logQueue.length = 0;
@@ -64,6 +66,7 @@ function stepPlay() {
   moveItems();
   moveWarnings();
   moveLasers();
+  movePhrases();
   moveBoss();
   collide();                    // 撃破が先、被弾が後
   sweep(state.enemies);
@@ -71,7 +74,7 @@ function stepPlay() {
   sweep(state.pBullets);
   sweep(state.items);
   sweep(state.warnings);
-  sweep(state.lasers);
+  sweep(state.phrases);
   sweep(state.laserWarns);
   state.scroll += CFG.scroll;
 }
@@ -157,4 +160,4 @@ document.addEventListener('visibilitychange', () => {
 
 // デバッグ用にコンソールから触れるように
 // step は描画なしの早回し用（自動プレイでの通し確認）
-if (DEBUG) window.__pop = { state, CFG, input, startGame, step };
+if (DEBUG) window.__pop = { state, CFG, input, startGame, step, sim: opt => sim(opt, startGame, step) };

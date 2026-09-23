@@ -309,20 +309,27 @@ export function coreSprite(which, crack) {
   return c;
 }
 
-// ---- 文字の弾：ドット風フォントで1文字。白フチ + 弾の色 ----
+// ---- ボスの声の1文字：ドット風フォント。ふつうは白フチ＋弾の色、強調は反転（色フチ＋白） ----
 // フォントの読み込みが終わったら作り直す（それまでは代用フォントで描いたものを使う）
-export const GLYPH_SIZE = 22;
-export function glyphSprite(ch, col) {
-  const k = 'g|' + ch + '|' + col;
+export const GLYPH_SIZE = 24;
+export function glyphSprite(ch, col, px = GLYPH_SIZE, invert = false) {
+  const k = 'g|' + ch + '|' + col + '|' + px + '|' + (invert ? 1 : 0);
   let c = cache.get(k);
   if (c) return c;
-  const s = GLYPH_SIZE, d = s + 10;
+  const d = Math.ceil(px * 1.2 + 10);
+  const lw = Math.max(4, px * 0.26);
   c = mk(d, d, g => {
-    g.font = `${s}px ${RETRO_FONT}`;
+    g.font = `${px}px ${RETRO_FONT}`;
     g.textAlign = 'center'; g.textBaseline = 'middle';
     g.lineJoin = 'round';
-    g.strokeStyle = '#fff'; g.lineWidth = 6; g.strokeText(ch, d / 2, d / 2 + 1);
-    g.fillStyle = col; g.fillText(ch, d / 2, d / 2 + 1);
+    if (invert) {
+      g.strokeStyle = '#2a2140'; g.lineWidth = lw + 4; g.strokeText(ch, d / 2, d / 2 + 1);
+      g.strokeStyle = col; g.lineWidth = lw; g.strokeText(ch, d / 2, d / 2 + 1);
+      g.fillStyle = '#fff'; g.fillText(ch, d / 2, d / 2 + 1);
+    } else {
+      g.strokeStyle = '#fff'; g.lineWidth = lw; g.strokeText(ch, d / 2, d / 2 + 1);
+      g.fillStyle = col; g.fillText(ch, d / 2, d / 2 + 1);
+    }
   });
   cache.set(k, c);
   return c;
@@ -331,7 +338,8 @@ export function glyphSprite(ch, col) {
 export function watchFont() {
   if (!document.fonts?.load) return;
   document.fonts.load(`${GLYPH_SIZE}px "DotGothic16"`, 'アイ').then(() => {
-    for (const k of [...cache.keys()]) if (k.startsWith('g|')) cache.delete(k);
+    // 文字を含む絵（声の文字・アイテムの W/P/B）を作り直す
+    for (const k of [...cache.keys()]) if (k.startsWith('g|') || k.startsWith('i|')) cache.delete(k);
   }).catch(() => {});
 }
 
@@ -351,7 +359,7 @@ export function itemSprite(kind) {
     const col = { way: '#3FA7F5', pow: '#F0503C', bomb: COL.ORANGE }[kind];
     g.fillStyle = '#fff'; roundRect(g, 1, 1, 26, 26, 8); g.fill();
     g.fillStyle = col;    roundRect(g, 4, 4, 20, 20, 6); g.fill();
-    g.fillStyle = '#fff'; g.font = 'bold 15px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = '#fff'; g.font = `16px ${RETRO_FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText({ way: 'W', pow: 'P', bomb: 'B' }[kind], 14, 15);
   });
   cache.set(k, c);

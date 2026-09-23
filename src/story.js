@@ -52,10 +52,27 @@ export function onOrbBroken(o) {
   if (o.frag && STORY.frags[o.frag]) showLine(STORY.frags[o.frag]);
 }
 
-// 敵の船体番号（正常な個体だけ）。演出なので fxRng 相当の順繰りで十分
+// 敵の船体番号（正常な個体だけ）。1回のプレイで同じ番号は二度出さない。047 は無い
+// 最初は 047 の前後から（その列の中に自分の番号がある）。残りは 001〜299 を決まった順に混ぜたもの
+const HULL_POOL = (() => {
+  const first = STORY.hullNumbers;
+  const rest = [];
+  for (let n = 1; n <= 299; n++) {
+    const s = String(n).padStart(3, '0');
+    if (s !== '047' && !first.includes(s)) rest.push(s);
+  }
+  let seed = 0x5eed;
+  for (let i = rest.length - 1; i > 0; i--) {         // 固定の並び（ゲームの乱数は使わない）
+    seed = (seed * 1103515245 + 12345) >>> 0;
+    const j = seed % (i + 1);
+    [rest[i], rest[j]] = [rest[j], rest[i]];
+  }
+  return [...first, ...rest];
+})();
 let numIdx = 0;
+export const resetHullNumbers = () => { numIdx = 0; };
 export function nextHullNumber() {
-  const n = STORY.hullNumbers[numIdx % STORY.hullNumbers.length];
+  const n = HULL_POOL[numIdx % HULL_POOL.length];
   numIdx++;
   return n;
 }

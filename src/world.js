@@ -16,7 +16,7 @@ export const state = {
   pBullets: [],
   items: [],
   warnings: [],             // 出現予告の「▶」
-  lasers: [],               // 水平レーザー
+  phrases: [],              // ボスの声（言葉のかたまり）とビーム
   laserWarns: [],           // レーザーの予告線
   popups: [],
   boss: null,
@@ -47,7 +47,7 @@ export function resetWorld() {
   state.pBullets.length = 0;
   state.items.length = 0;
   state.warnings.length = 0;
-  state.lasers.length = 0;
+  state.phrases.length = 0;
   state.laserWarns.length = 0;
   state.popups.length = 0;
   state.boss = null;

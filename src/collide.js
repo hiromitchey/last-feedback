@@ -5,7 +5,6 @@ import { damageEnemy } from './enemies.js';
 import { bossTargetable, damagePart, damageBoss } from './boss.js';
 import { damagePlayer, gainLevel } from './player.js';
 import { scatter } from './items.js';
-import { beamX } from './bullets.js';
 import { onOrbBroken } from './story.js';
 import { fxRng } from './rng.js';
 
@@ -107,14 +106,18 @@ export function collide() {
     if (hit(b, p, b.r, CFG.player.r)) { damagePlayer(); break; }
   }
 
-  // 2b. 文字のビーム → 自機。高さが近いときだけ1文字ずつ見る
-  const LR = CFG.laser.r + CFG.player.r;
-  beams: for (const l of state.lasers) {
-    if (Math.abs(p.y - l.y) >= LR) continue;
-    for (let i = 0; i < l.chars.length; i++) {
-      if (l.chars[i] === '　' || l.chars[i] === ' ') continue;   // 空白は当たらない
+  // 2b. ボスの声・ビーム → 自機。1文字ずつ（出てくる途中は小さい）。高さが遠い列は飛ばす
+  words: for (const q of state.phrases) {
+    if (q.beam) {
+      // ビームは帯で当たる（横断する帯なので高さの差だけ見る）
+      if (q.w > 6 && Math.abs(p.y - q.y0) < q.w * 0.34 + CFG.player.r) { damagePlayer(); break; }
+      continue;
+    }
+    if (Math.abs(p.y - q.y0) > q.amp + 40) continue;
+    for (const c of q.chars) {
+      if (c.space || c.sc < 0.5) continue;
       checks++;
-      if (hit({ x: beamX(l, i), y: l.y }, p, CFG.laser.r, CFG.player.r)) { damagePlayer(); break beams; }
+      if (hit(c, p, c.r * c.sc, CFG.player.r)) { damagePlayer(); break words; }
     }
   }
 

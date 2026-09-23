@@ -4,6 +4,7 @@ import { CFG, COL, SPEED_OK, DEBUG } from './config.js';
 import { state } from './world.js';
 import { gameRng } from './rng.js';
 import * as sched from './sched.js';
+import { parsePhrase } from './text.js';
 
 const weightOf = arr => arr.reduce((n, b) => n + (b.hp ? CFG.bullet.orbWeight : 1), 0);
 // 同時弾の上限。道中は区間ごとにさらに低い（A 10 / B 16）
@@ -20,53 +21,35 @@ function push(x, y, ang, speed, col, opt = {}) {
     curve: opt.curve ?? 0, acc: opt.acc ?? 0,
     hp: opt.hp, maxhp: opt.hp, spin: 0, spinV: opt.spinV ?? 0,
     needle: !!opt.needle, id: 0, kind: opt.kind,
-    ch: opt.ch ?? null,          // 文字の弾（ボス）。描画が文字になるだけで、判定は円のまま
   };
-  if (b.ch) b.r = CFG.textBullet.r;
   state.eBullets.push(b);
   return b;
 }
 
-// text を渡すと文字の弾になる。1文字ずつ順に割り当て、発射元ごとに続きから撃つ
-// （弾数が難易度で変わっても、撃つたびに言葉の続きが出てくる）
-function takeChars(src, text, n) {
-  if (!text) return [];
-  const cs = [...text].filter(c => c !== '　' && c !== ' ');
-  if (src.textKey !== text) { src.textKey = text; src.textPos = 0; }
-  const out = [];
-  for (let i = 0; i < n; i++) out.push(cs[(src.textPos + i) % cs.length]);
-  src.textPos = (src.textPos + n) % cs.length;
-  return out;
-}
-
 // 自機狙いの針。速度は 3.4 で頭打ち
-export function needle(src, speed, col = COL.PINK, off = 0, text = null) {
+export function needle(src, speed, col = COL.PINK, off = 0) {
   const p = state.player;
-  const ch = takeChars(src, text, 1)[0] ?? null;
   const ang = Math.atan2(p.y - src.y, p.x - src.x) + off;
-  return push(src.x, src.y, ang, Math.min(speed, CFG.bullet.speedMax), col, { r: 4, needle: !ch, ch });
+  return push(src.x, src.y, ang, Math.min(speed, CFG.bullet.speedMax), col, { r: 4, needle: true });
 }
 
 // リング。way数は10で頭打ち（原則1・4）。隙間が自機に向くよう位相を取る（原則5）
-export function ring(src, n, speed, col, offset = null, text = null) {
+export function ring(src, n, speed, col, offset = null) {
   n = Math.min(n, CFG.bullet.ringMax);
   n = Math.max(6, Math.round(n * state.diff.count));
   const p = state.player;
   const toP = Math.atan2(p.y - src.y, p.x - src.x);
   const base = offset ?? toP + Math.PI / n;   // 自機方向がちょうど弾と弾の間になる
-  // 文字は時計回りに並べる（画面上で左から右へ読めるよう、自機側＝左を起点に）
-  const cs = takeChars(src, text, n);
-  for (let i = 0; i < n; i++) push(src.x, src.y, base + i * Math.PI * 2 / n, speed, col, { ch: cs[i] });
+  for (let i = 0; i < n; i++) push(src.x, src.y, base + i * Math.PI * 2 / n, speed, col);
 }
 
 // 扇。隣り合う弾の角度差が下限を割るなら n を減らす（原則1）
 const FAN_MIN_ANG = CFG.bullet.minGap / 180;   // 発射から約100px先で隙間64px
-export function fan(src, n, dir, spread, speed, col, text = null) {
+export function fan(src, n, dir, spread, speed, col) {
   n = Math.max(2, Math.round(n * state.diff.count));
   while (n > 2 && spread / (n - 1) < FAN_MIN_ANG) n--;
   if (dir === 'aim') dir = Math.atan2(state.player.y - src.y, state.player.x - src.x);
-  const cs = takeChars(src, text, n);
-  for (let i = 0; i < n; i++) push(src.x, src.y, dir + (i / (n - 1) - 0.5) * spread, speed, col, { ch: cs[i] });
+  for (let i = 0; i < n; i++) push(src.x, src.y, dir + (i / (n - 1) - 0.5) * spread, speed, col);
 }
 
 // 水平ビーム。必ず laserWarn（予告80f）を経る。2本なら間に80px以上（原則3・5）
@@ -92,23 +75,80 @@ export function* laserWarn(src, count) {
   for (const w of warns) w.alive = false;
 }
 
-export function hLaser(src, text = '■■■■■■■■■■■■■■■■■■■■■■■■') {
+// ビーム：帯が出ている間、その中をボスの声が程よい速さで流れる（電光掲示板のように）
+// 当たり判定は帯。文字は帯の中の飾り
+export function hLaser(src, text) {
   if (!src.pendingLaser) throw new Error('laserWarn を経ていない');
-  const chars = [...text];
-  for (const y of src.pendingLaser)
-    state.lasers.push({ y, head: src.x - 70, chars, alive: true });
+  const L = CFG.laser;
+  for (const y of src.pendingLaser) {
+    const q = phrase(src, (text + '|　|').repeat(4), { y, speed: L.textSpeed, amp: 0, col: COL.YELLOW, beam: true });
+    q.life = 0; q.w = 0; q.srcX = src.x - 80;
+  }
   src.pendingLaser = null;
 }
 
-// ビームの i 文字目の x 座標
-export const beamX = (l, i) => l.head + i * CFG.laser.spacing;
+// ---- ボスの「声」：言葉のかたまりが波打ちながら横に流れてくる ----
+// 文字は同じ波の上を列車のように続いて進む（だから読める）。1文字ずつ判定がある
+// 大きい言葉ほど判定も大きい。上限は形態ごとの同時フレーズ数（原則4の代わり）
+export function phrase(src, text, opt = {}) {
+  const F = CFG.phrase;
+  if (!opt.beam && state.phrases.filter(q => !q.beam).length >= (opt.max ?? F.max)) return null;
+  const chars = parsePhrase(text);
+  // 横に並べる。文字幅は大きさに比例、言葉の間に少し隙間
+  let x = 0, prevWord = 0;
+  for (const c of chars) {
+    const w = F.base * c.size * (c.space ? 0.5 : 0.95);
+    if (c.word !== prevWord) { x += F.base * 0.25; prevWord = c.word; }
+    c.dx = x + w / 2;
+    c.px = Math.round(F.base * c.size);
+    c.r = c.space ? 0 : F.base * c.size * F.hitRatio;
+    x += w;
+    // 言葉ごとに少し傾ける（強調は大きく）
+    c.tilt = c.big ? (c.word % 2 ? 0.14 : -0.12) : (c.word % 2 ? 0.05 : -0.06);
+  }
+  const q = {
+    chars, width: x,
+    x: src.x - 80, y0: opt.y ?? src.y,
+    v: (opt.speed ?? F.speed) * (opt.beam ? 1 : state.diff.speed),
+    amp: opt.amp ?? F.amp, k: Math.PI * 2 / F.wavelength, ph: opt.ph ?? 0,
+    col: opt.col ?? COL.VIOLET, beam: !!opt.beam, t: 0, alive: true,
+  };
+  layoutPhrase(q);
+  state.phrases.push(q);
+  return q;
+}
+
+// 各文字の位置・傾き・出てくるときの弾み（ポンと出る）
+function layoutPhrase(q) {
+  for (let i = 0; i < q.chars.length; i++) {
+    const c = q.chars[i];
+    c.x = q.x + c.dx;
+    const a = q.k * c.x + q.ph;
+    c.y = q.y0 + Math.sin(a) * q.amp + Math.sin(q.t * 0.09 + c.word) * 2;
+    c.rot = c.tilt + Math.atan(Math.cos(a) * q.amp * q.k) * 0.6;   // 波の坂に合わせて傾く
+    const u = q.beam ? 1 : Math.min(1, Math.max(0, (q.t - i * 3) / 14));
+    const e = u - 1, back = 2.2;
+    c.sc = u <= 0 ? 0 : 1 + (back + 1) * e * e * e + back * e * e;   // easeOutBack
+  }
+}
+
+export function movePhrases() {
+  const L = CFG.laser;
+  for (const q of state.phrases) {
+    q.t++;
+    q.x -= q.v;
+    layoutPhrase(q);
+    if (q.beam) {
+      // 太くなって、しばらく出ていて、細くなる
+      q.life++;
+      const u = q.life / L.fire;
+      q.w = L.width * Math.min(1, u * 8, (1 - u) * 8);
+      if (q.life >= L.fire) q.alive = false;
+    } else if (q.x + q.width < -40) q.alive = false;
+  }
+}
 
 export function moveLasers() {
-  const L = CFG.laser;
-  for (const l of state.lasers) {
-    l.head -= L.speed;
-    if (beamX(l, l.chars.length - 1) < -30) l.alive = false;
-  }
   for (const w of state.laserWarns) if (--w.t <= 0) w.alive = false;
 }
 
