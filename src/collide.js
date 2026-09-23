@@ -1,0 +1,109 @@
+// 当たり判定。すべて円対円、sqrt なし、総当たり（技術設計書 8章）
+import { CFG } from './config.js';
+import { state, spawnParticle, popup } from './world.js';
+import { damageEnemy } from './enemies.js';
+import { damagePlayer, gainPower } from './player.js';
+import { scatter } from './items.js';
+import { fxRng } from './rng.js';
+
+const hit = (a, b, ra, rb) => {
+  const dx = a.x - b.x, dy = a.y - b.y, r = ra + rb;
+  return dx * dx + dy * dy < r * r;
+};
+
+export let checks = 0;
+const PB_R = 5;   // 自弾の判定半径
+
+// 貫通弾は1体につき1回だけ。通常弾は当たったら消える
+function consume(b, target) {
+  if (b.pierce) {
+    if (b.hitIds.has(target.id)) return false;
+    b.hitIds.add(target.id);
+  } else {
+    b.alive = false;
+  }
+  return true;
+}
+
+function hitOrbs(b) {
+  for (const o of state.eBullets) {
+    if (!o.hp || !o.alive) continue;
+    checks++;
+    if (!hit(b, o, PB_R, o.r)) continue;
+    if (!consume(b, o)) continue;
+    o.hp -= b.dmg;
+    o.hitFlash = 3;
+    state.score += CFG.score.hit;
+    if (o.hp <= 0) breakOrb(o);
+    return !b.alive;
+  }
+  return false;
+}
+
+function breakOrb(o) {
+  o.alive = false;
+  state.score += CFG.score.orb;
+  scatter('kakera', CFG.orb.kakera, o.x, o.y, 1.6, 3.2);
+  if (o.boss) scatter('power', 1, o.x, o.y, 0, 2, 0);
+  for (let i = 0; i < 30; i++) {
+    const a = fxRng.rnd() * Math.PI * 2, s = 2 + fxRng.rnd() * 5;
+    spawnParticle(o.x, o.y, Math.cos(a) * s, Math.sin(a) * s, 20 + fxRng.rnd() * 25,
+      `hsl(${(fxRng.rnd() * 360) | 0},90%,70%)`, 3 + fxRng.rnd() * 4);
+  }
+  state.shake = Math.max(state.shake, 4);
+  popup('パキーン！', o.x, o.y - 16, { size: 28, col: '#FFD54F', life: 45 });
+}
+
+function hitEnemies(b) {
+  for (const e of state.enemies) {
+    if (!e.alive) continue;
+    checks++;
+    if (!hit(b, e, PB_R, e.r)) continue;
+    if (!consume(b, e)) continue;
+    damageEnemy(e, b.dmg);
+    if (!b.alive) return;
+  }
+}
+
+export function collide() {
+  checks = 0;
+  const p = state.player;
+
+  // 1. 自弾 → でか玉 → (ボス部位 → ボス本体: Step 13) → 敵
+  for (const b of state.pBullets) {
+    if (!b.alive) continue;
+    if (hitOrbs(b)) continue;
+    hitEnemies(b);
+  }
+
+  // 2. 敵弾（でか玉含む）→ 自機
+  for (const b of state.eBullets) {
+    if (!b.alive) continue;
+    checks++;
+    if (hit(b, p, b.r, CFG.player.r)) { damagePlayer(); break; }
+  }
+
+  // 3. 敵本体 → 自機（道中の主脅威）
+  for (const e of state.enemies) {
+    if (!e.alive) continue;
+    checks++;
+    if (hit(e, p, e.r, CFG.player.r)) { damagePlayer(); break; }
+  }
+
+  // 4. アイテム → 自機
+  for (const it of state.items) {
+    if (!it.alive || it.t < 10) continue;
+    checks++;
+    if (!hit(it, p, CFG.item.r, CFG.item.pickR)) continue;
+    it.alive = false;
+    if (it.kind === 'power') {
+      state.score += CFG.score.item;
+      gainPower();
+    } else if (it.kind === 'kakera') {
+      state.score += CFG.score.kakera;
+      popup('+' + CFG.score.kakera, it.x, it.y - 12, { size: 14, col: '#fff', life: 24 });
+    } else if (it.kind === 'bomb') {
+      p.bombs = Math.min(p.bombs + 1, 6);
+    }
+  }
+}
