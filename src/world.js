@@ -70,6 +70,7 @@ export function resetWorld() {
   state.blackout = null;
   state.mid = null;          // 中ボス
   state.slowT = 0;           // 中ボス撃破のスロー
+  state.warp = null;         // 面の区切りのワープ
   state.stage = 0;           // 面（0〜2）
   state.planet = 0.8;        // 奥の惑星の大きさ。面が進むほど近づく
   for (const p of particles) p.alive = false;

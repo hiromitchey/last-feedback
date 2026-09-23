@@ -16,20 +16,20 @@ const FADE = 30;
 // ---- 断片の1行表示（画面上部。戦いの邪魔をしない位置） ----
 // 表示中なら順番待ち（続けて割っても上書きしない）
 export function showLine(parts, opt = {}) {
-  const L = { parts, t: 0, y: opt.y ?? 96, size: opt.size ?? 22 };
+  const L = { parts, t: 0, y: opt.y ?? 96, size: opt.size ?? 22, type: opt.type ?? TYPE };
   if (state.logLine && !opt.now) state.logQueue.push(L);
   else state.logLine = L;
 }
 
-const lineTotal = L => L.parts.reduce((s, p) => s + [...p].length * TYPE, 0) + (L.parts.length - 1) * PART_GAP;
+const lineTotal = L => L.parts.reduce((s, p) => s + [...p].length * L.type, 0) + (L.parts.length - 1) * PART_GAP;
 
 // 何文字目まで見えているか。繰り返す行は、前の部分を出し切ってから間を置いて次へ
 export function lineProgress(L) {
   let t = L.t, shown = [], done = true;
   for (let i = 0; i < L.parts.length; i++) {
     const n = [...L.parts[i]].length;
-    const need = n * TYPE;
-    if (t < need) { shown.push([...L.parts[i]].slice(0, Math.floor(t / TYPE)).join('')); done = false; break; }
+    const need = n * L.type;
+    if (t < need) { shown.push([...L.parts[i]].slice(0, Math.floor(t / L.type)).join('')); done = false; break; }
     shown.push(L.parts[i]);
     t -= need;
     if (i < L.parts.length - 1) { if (t < PART_GAP) { done = false; break; } t -= PART_GAP; }
@@ -150,6 +150,9 @@ export function* afterBoss(b) {
   yield* sched.wait(90);                     // 静かになる
   state.logQueue.length = 0;
   showLine([STORY.final], { y: CFG.H / 2 + 150, size: 24, now: true });
+  yield* sched.waitUntil(() => !state.logLine);
+  yield* sched.wait(60);
+  showLine([STORY.finalCall], { y: CFG.H / 2 + 150, size: 20, now: true, type: 9 });   // ゆっくり、途切れ途切れ
   yield* sched.waitUntil(() => !state.logLine);
   yield* sched.wait(40);
   state.blackout = { t: 0 };                 // 暗転

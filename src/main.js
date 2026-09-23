@@ -40,6 +40,7 @@ function doContinue() {
   state.mid = null;
   state.bossWarn = 0;
   state.slowT = 0;
+  state.warp = null;
   state.logLine = null; state.logQueue.length = 0;
   sched.clear();
   const p = state.player;
@@ -51,6 +52,13 @@ function doContinue() {
   state.score = 0;
   startStage(cp.stage, cp.part, cp.form ?? 1, cp.cores ?? null);
   state.mode = 'play';
+}
+
+// ワープ中は背景が速く流れる（立ち上がって、ピーク、また戻る）
+function warpSpeed() {
+  if (!state.warp) return 1;
+  const u = ++state.warp.t / CFG.warpFrames;
+  return 1 + 14 * Math.sin(Math.PI * Math.min(1, u));
 }
 
 function toTitle() {
@@ -80,7 +88,7 @@ function stepPlay() {
   sweep(state.warnings);
   sweep(state.phrases);
   sweep(state.laserWarns);
-  state.scroll += CFG.scroll;
+  state.scroll += CFG.scroll * warpSpeed();
 }
 
 function step() {

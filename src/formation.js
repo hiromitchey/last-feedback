@@ -249,24 +249,32 @@ function* road3b() {
 
 // ---- 面の構成（物語に合わせた3面。PLAN.md） ----
 // part: { road, min, cap } 道中 / { mid } 中ボス / { boss } 母船
+// 各面は「道中 → 中ボス」で終わる（中ボスを倒したら面の終わり。ワープして次の面へ）
+const road1 = function* () { yield* road1a(); yield* road1b(); };
+const road2 = function* () { yield* road2a(); yield* road2b(); };
+const road3 = function* () { yield* road3a(); yield* road3b(); };
 export const STAGES = [
   { name: 'STAGE 1', title: '', planet: 0.8, parts: [
-    { road: road1a, min: 35 * 60, cap: 10 },
-    { mid: 1 },
-    { road: road1b, min: 15 * 60, cap: 10 },
+    { road: road1, min: 45 * 60, cap: 10 },
+    { mid: 1 },                                     // 少しだけ歪んだ試作品
   ] },
   { name: 'STAGE 2', title: '', planet: 1.0, parts: [
-    { road: road2a, min: 30 * 60, cap: 16 },
+    { road: road2, min: 45 * 60, cap: 16 },
     { mid: 2 },                                     // 修理機
-    { road: road2b, min: 20 * 60, cap: 16 },
   ] },
   { name: 'STAGE 3', title: '', planet: 1.35, parts: [
-    { road: road3a, min: 35 * 60, cap: 16 },
+    { road: road3, min: 45 * 60, cap: 16 },
     { mid: 3 },                                     // 原型をとどめないもの
-    { road: road3b, min: 15 * 60, cap: 16 },
     { boss: true },
   ] },
 ];
+
+// 面の区切り：星が線になって流れるワープ（約1.5秒）。中ボスを倒して記録を読んだあと
+function* warp() {
+  state.warp = { t: 0 };
+  yield* sched.wait(CFG.warpFrames);
+  state.warp = null;
+}
 
 function* runPart(si, pi, part, bossForm, cores) {
   const S = STAGES[si];
@@ -287,6 +295,7 @@ function* runPart(si, pi, part, bossForm, cores) {
   } else if (part.mid) {
     state.segCap = CFG.boss.cap[0];
     yield* midbossFight(part.mid);
+    yield* warp();
   } else if (part.boss) {
     state.checkpoint.boss = true;
     yield* bossFight(bossForm, cores);

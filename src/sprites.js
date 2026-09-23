@@ -481,6 +481,66 @@ export function watchFont() {
   }).catch(() => {});
 }
 
+// ---- 背景の惑星：海・大陸・雲・大気。昼と夜の境目があり、夜側には灯りがひとつも無い（物語） ----
+// 事前生成なのでグラデーションを使ってよい（毎フレームは作らない）
+export const PLANET_R = 120;
+export function planetSprite() {
+  const k = 'planet';
+  let c = cache.get(k);
+  if (c) return c;
+  const R = PLANET_R, pad = 24, d = (R + pad) * 2, m = d / 2;
+  let seed = 0x47;                                     // 固定の形（ゲームの乱数は使わない）
+  const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296);
+  c = mk(d, d, g => {
+    // 大気の薄い光
+    const glow = g.createRadialGradient(m, m, R * 0.95, m, m, R + pad);
+    glow.addColorStop(0, 'rgba(120,190,255,.45)');
+    glow.addColorStop(1, 'rgba(120,190,255,0)');
+    g.fillStyle = glow; g.beginPath(); g.arc(m, m, R + pad, 0, 7); g.fill();
+    // 海
+    g.save();
+    g.beginPath(); g.arc(m, m, R, 0, 7); g.clip();
+    const sea = g.createRadialGradient(m - R * 0.4, m - R * 0.3, R * 0.1, m, m, R);
+    sea.addColorStop(0, '#4f8fd0'); sea.addColorStop(1, '#1d3f78');
+    g.fillStyle = sea; g.fillRect(0, 0, d, d);
+    // 大陸：いびつな塊をいくつか
+    const land = (cx, cy, r, col) => {
+      g.fillStyle = col; g.beginPath();
+      const n = 14;
+      for (let i = 0; i <= n; i++) {
+        const a = i / n * Math.PI * 2, rr = r * (0.65 + rnd() * 0.5);
+        const x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr * 0.8;
+        i ? g.lineTo(x, y) : g.moveTo(x, y);
+      }
+      g.closePath(); g.fill();
+    };
+    land(m - R * 0.35, m - R * 0.25, R * 0.38, '#5b8a4c');
+    land(m - R * 0.1, m + R * 0.35, R * 0.3, '#7a8f52');
+    land(m + R * 0.4, m - R * 0.1, R * 0.34, '#5b8a4c');
+    land(m - R * 0.55, m + R * 0.25, R * 0.16, '#8a7a52');
+    land(m + R * 0.15, m - R * 0.6, R * 0.2, '#6d8a50');
+    // 雲の帯
+    g.fillStyle = 'rgba(255,255,255,.55)';
+    for (let i = 0; i < 9; i++) {
+      g.beginPath();
+      g.ellipse(m + (rnd() - 0.5) * R * 1.6, m + (rnd() - 0.5) * R * 1.6, R * (0.2 + rnd() * 0.3), R * 0.05, -0.3, 0, 7);
+      g.fill();
+    }
+    // 夜側：右下がすっぽり暗い。都市の灯りは、ひとつも無い
+    const night = g.createLinearGradient(m - R * 0.1, m - R * 0.3, m + R * 0.7, m + R * 0.5);
+    night.addColorStop(0, 'rgba(6,8,18,0)');
+    night.addColorStop(0.35, 'rgba(6,8,18,.85)');
+    night.addColorStop(1, 'rgba(6,8,18,.97)');
+    g.fillStyle = night; g.fillRect(0, 0, d, d);
+    g.restore();
+    // 昼側の縁の光
+    g.strokeStyle = 'rgba(170,220,255,.8)'; g.lineWidth = 2.5;
+    g.beginPath(); g.arc(m, m, R, Math.PI * 0.55, Math.PI * 1.45); g.stroke();
+  });
+  cache.set(k, c);
+  return c;
+}
+
 // ---- アイテム ----
 export function itemSprite(kind) {
   const k = 'i|' + kind;
@@ -521,7 +581,7 @@ export function prebuild() {
   for (const k of ['way', 'pow', 'kakera', 'bomb']) itemSprite(k);
   mokoSprite(); byunSprite();
   for (let f = 1; f <= 3; f++) bossSprite(f);
-  midSprite(1); midSprite(2); midSprite(3); guniSprite();
+  midSprite(1); midSprite(2); midSprite(3); guniSprite(); planetSprite();
   for (const w of ['upper', 'lower']) for (let cr = 0; cr < 4; cr++) coreSprite(w, cr);
   watchFont();
   return cache.size;

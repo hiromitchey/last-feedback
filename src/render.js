@@ -57,16 +57,17 @@ function drawBackground() {
   // 惑星（ずっと奥に見えている。夜側に灯りがひとつも無い）
   // 面が進むほど大きく見える（近づいている）
   const px = 780 - (state.scroll * 0.02) % 40, k = state.planet ?? 1;
-  ctx.fillStyle = '#23304a'; ctx.beginPath(); ctx.arc(px, 110, 86 * k, 0, 7); ctx.fill();
-  ctx.fillStyle = '#2d3d5c'; ctx.beginPath(); ctx.arc(px - 22 * k, 96, 70 * k, 0, 7); ctx.fill();
-  ctx.fillStyle = '#171a2e'; ctx.beginPath(); ctx.arc(px + 40 * k, 110 + 14 * k, 72 * k, 0, 7); ctx.fill();
+  blit(S.planetSprite(), px, 120, 0, 0.75 * k);
+  // ワープ中は星が横に伸びて線になる
+  const streak = state.warp ? Math.sin(Math.PI * Math.min(1, state.warp.t / CFG.warpFrames)) : 0;
   for (const L of layers) {
-    ctx.fillStyle = `rgba(200,210,255,${L.a})`;
+    ctx.fillStyle = `rgba(200,210,255,${Math.min(1, L.a + streak * 0.4)})`;
     const off = (state.scroll * L.speed) % 1920;
+    const len = p => p.s + streak * 120 * L.speed;
     for (const p of L.pts) {
       let x = p.x - off; if (x < -10) x += 1920;
       if (x > CFG.W + 10) continue;
-      ctx.fillRect(x, p.y, p.s, p.s);
+      ctx.fillRect(x, p.y, len(p), p.s);
     }
   }
 }
@@ -581,9 +582,7 @@ function drawEnding() {
     for (const p of L.pts) if (p.x < CFG.W) ctx.fillRect(p.x, p.y, p.s, p.s);
   }
   // 灯りのない惑星（大きく）
-  ctx.fillStyle = '#1b2438'; ctx.beginPath(); ctx.arc(760, 150, 190, 0, 7); ctx.fill();
-  ctx.fillStyle = '#222d45'; ctx.beginPath(); ctx.arc(710, 120, 150, 0, 7); ctx.fill();
-  ctx.fillStyle = '#07080f'; ctx.beginPath(); ctx.arc(840, 200, 160, 0, 7); ctx.fill();
+  blit(S.planetSprite(), 780, 160, 0, 1.6);
   // 止まった母船。継ぎ接ぎだらけ
   ctx.globalAlpha = 0.55;
   blit(S.bossSprite(3, 'body'), 640, 330);

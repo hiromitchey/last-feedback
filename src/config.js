@@ -88,6 +88,7 @@ export const CFG = {
   score: { hit: 10, orb: 500, kakera: 200, item: 200, overPower: 600 },
 
   scroll: 2.0,
+  warpFrames: 90,             // 面の区切りのワープ
 
   diff: {
     easy:   { speed: 0.8, count: 0.7, hp: 0.8, orbHp: 0.7, lives: 7, bombs: 4 },  // 既定
