@@ -534,7 +534,7 @@ function drawTouchUI() {
 }
 
 function drawTitle() {
-  text('ポップショット', CFG.W / 2, CFG.H / 2 - 50, 64, '#fff', 'center', '#FF5C8A');
+  text('LAST JOURNEY', CFG.W / 2, CFG.H / 2 - 50, 72, '#fff', 'center', '#FF5C8A');
   if ((state.frame >> 5) & 1)
     text('クリック / タップ / Z ではじめる', CFG.W / 2, CFG.H / 2 + 40, 22, '#FFD54F');
   const help = [
