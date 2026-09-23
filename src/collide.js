@@ -45,6 +45,8 @@ function breakOrb(o) {
   state.score += CFG.score.orb;
   scatter('kakera', CFG.orb.kakera, o.x, o.y, 1.6, 3.2);
   if (o.boss) scatter('power', 1, o.x, o.y, 0, 2, 0);
+  const p = state.player;
+  p.energy = Math.min(CFG.energy.max, p.energy + CFG.energy.orbBonus);
   for (let i = 0; i < 30; i++) {
     const a = fxRng.rnd() * Math.PI * 2, s = 2 + fxRng.rnd() * 5;
     spawnParticle(o.x, o.y, Math.cos(a) * s, Math.sin(a) * s, 20 + fxRng.rnd() * 25,

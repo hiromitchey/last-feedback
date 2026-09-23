@@ -21,6 +21,11 @@ export function handleKey(code) {
     popup('G' + (p.grade + 1), CFG.W / 2, 80, { size: 18, life: 50 });
   }
   if (code === 'F7') dbg.stats = !dbg.stats;
+  if (code === 'F9') {
+    CFG.energy.enabled = !CFG.energy.enabled;
+    if (state.player) { state.player.energy = CFG.energy.max; state.player.empty = false; }
+    popup('エネルギー ' + (CFG.energy.enabled ? 'ON' : 'OFF'), CFG.W / 2, 80, { size: 18, life: 50 });
+  }
 }
 
 let fpsN = 0, fpsLast = performance.now();

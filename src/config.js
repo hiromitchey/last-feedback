@@ -21,6 +21,17 @@ export const CFG = {
   gradeCost: [2, 3, 4],
   scatterOnHit: 4,            // 被弾時にばら撒くパワー
 
+  // 【試験】ショットのエネルギー。撃つと減り、撃たないと回復する。F9 でオン・オフ
+  energy: {
+    enabled: true,
+    max: 100,
+    cost: [1.0, 1.4, 1.8, 2.2],  // 1トリガーあたり（G1〜G4）。G1 は撃ちっぱなしで約8秒、G4 は約4秒
+    regen: 1.2,                  // 撃っていないときの回復量/フレーム（空→満タン 約1.4秒）
+    regenDelay: 10,              // 撃つのをやめてから回復が始まるまで
+    lock: 180,                   // 切れたら撃てない時間（3秒）。その間にゲージが満タンまで戻る
+    orbBonus: 30,                // でか玉を割ると回復
+  },
+
   bullet: { cap: 30, orbWeight: 3, speedMax: 3.4, ringMax: 10, minGap: 64 },
   warn:   { shot: 30, laser: 80, spawn: 24 },
 

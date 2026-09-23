@@ -34,6 +34,7 @@ export function resetWorld() {
     x: P.startX, y: P.startY, grade: 0, power: 0,
     invincible: 0, shotCd: 0, lives: state.diff.lives, bombs: state.diff.bombs,
     dead: false, gradeFx: 0,
+    energy: CFG.energy.max, empty: false, idle: 0,
   };
   state.enemies.length = 0;
   state.eBullets.length = 0;

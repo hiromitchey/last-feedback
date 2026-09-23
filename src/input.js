@@ -29,6 +29,7 @@ export const touchButtons = {
 let cv = null;
 const keys = new Set();
 let mouseBtn = 0, touchBtn = 0, padBtn = 0;
+let latch = 0;   // 次の sample までに押されたボタン。1フレームより短いクリックを取りこぼさない
 const roles = new Map();  // pointerId -> 'move' | 'shot' | 'bomb' | 'pause' | 'mouse'
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -63,8 +64,8 @@ export function initInput(canvas) {
     if (e.pointerType === 'mouse') {
       input.mode = 'pointer';
       input.tx = p.x; input.ty = p.y;
-      if (e.button === 0) mouseBtn |= BTN.SHOT;
-      if (e.button === 2) mouseBtn |= BTN.BOMB;
+      if (e.button === 0) { mouseBtn |= BTN.SHOT; latch |= BTN.SHOT; }
+      if (e.button === 2) { mouseBtn |= BTN.BOMB; latch |= BTN.BOMB; }
       roles.set(e.pointerId, 'mouse');
       return;
     }
@@ -75,7 +76,7 @@ export function initInput(canvas) {
     try { cv.setPointerCapture(e.pointerId); } catch {}
     if (role === 'move') { input.mode = 'pointer'; setTouchTarget(p); }
     else if (role === 'auto') input.toggleAuto = true;
-    else touchBtn |= TOUCH_BIT[role];
+    else { touchBtn |= TOUCH_BIT[role]; latch |= TOUCH_BIT[role]; }
   }, { passive: false });
 
   cv.addEventListener('pointermove', e => {
@@ -151,7 +152,8 @@ export function sample() {
   if (keys.has('Escape') || keys.has('KeyP')) kb |= BTN.PAUSE;
   if (keys.has('ShiftLeft') || keys.has('ShiftRight')) kb |= BTN.SLOW;
 
-  input.btn = kb | mouseBtn | touchBtn | padBtn;
+  input.btn = kb | mouseBtn | touchBtn | padBtn | latch;
+  latch = 0;
 }
 
 // 自機の位置をポインタの目標に合わせる（リスタート時など、急に飛ばないように）

@@ -39,8 +39,27 @@ export function shoot() {
   if (p.shotCd > 0) { p.shotCd--; }
   // 既定は手動（押している間だけ）。オートショットは設定の逃げ道（技術設計書 6章）
   const want = state.autoShot || held(BTN.SHOT);
+  const EN = CFG.energy;
+  if (EN.enabled) {
+    // 切れたら lock フレームのあいだ撃てない。その間にゲージが満タンまで戻る
+    if (p.empty) {
+      p.energy = Math.min(EN.max, p.energy + EN.max / EN.lock);
+      if (--p.lockT <= 0) { p.empty = false; p.energy = EN.max; }
+      return;
+    }
+    // 撃っていない間だけ回復
+    if (want) p.idle = 0; else p.idle++;
+    if (p.idle > EN.regenDelay) p.energy = Math.min(EN.max, p.energy + EN.regen);
+  }
   if (!want || p.shotCd > 0) return;
   p.shotCd = CFG.player.shotInterval;
+  if (EN.enabled) {
+    p.energy -= EN.cost[p.grade];
+    if (p.energy <= 0) {
+      p.energy = 0; p.empty = true; p.lockT = EN.lock;
+      popup('エネルギー切れ！', p.x, p.y - 34, { size: 18, col: '#FF9E3D', life: 40 });
+    }
+  }
   const g = CFG.grade[p.grade];
   const sp = CFG.player.shotSpeed;
   for (let i = 0; i < g.ways; i++) {

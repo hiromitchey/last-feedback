@@ -171,6 +171,19 @@ function drawPlayer() {
   ctx.beginPath(); ctx.arc(p.x, p.y, CFG.player.r, 0, 7); ctx.stroke();
   ctx.fillStyle = 'rgba(255,92,138,.85)';
   ctx.beginPath(); ctx.arc(p.x, p.y, 2.5, 0, 7); ctx.fill();
+  drawEnergy(p);
+}
+
+// 【試験】エネルギーゲージ：自機の真下。満タンなら出さない
+function drawEnergy(p) {
+  const EN = CFG.energy;
+  if (!EN.enabled || p.energy >= EN.max) return;
+  const w = 44, h = 6, x = p.x - w / 2, y = p.y + 30;
+  ctx.fillStyle = '#fff'; ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
+  ctx.fillStyle = '#2a2140'; ctx.fillRect(x, y, w, h);
+  const r = p.energy / EN.max;
+  ctx.fillStyle = p.empty ? ((state.frame >> 2) & 1 ? '#FF5C8A' : '#FF9E3D') : r < 0.3 ? '#FF9E3D' : COL.AQUA;
+  ctx.fillRect(x, y, w * r, h);
 }
 
 function drawPopups() {
@@ -231,7 +244,7 @@ function drawTitle() {
     text('クリック / タップ / Z ではじめる', CFG.W / 2, CFG.H / 2 + 40, 22, '#FFD54F');
   const help = [
     'マウス：追従・左で撃つ　キー：矢印で移動・Zで撃つ・Shiftで低速',
-    'タッチ：ドラッグで移動・右下で撃つ　Q / AUTO：オートショット切替',
+    'タッチ：ドラッグで移動・右下で撃つ　Q / AUTO：オートショット切替　F9：エネルギー切替（試験）',
   ];
   help.forEach((s, i) => text(s, CFG.W / 2, CFG.H - 70 + i * 26, 15, '#cfd6ff'));
 }
