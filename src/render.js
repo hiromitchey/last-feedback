@@ -715,21 +715,22 @@ function drawEnding() {
   if (t < 120) { ctx.globalAlpha = 1 - t / 120; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, CFG.W, CFG.H); ctx.globalAlpha = 1; }
 }
 
-// ---- 廃墟の街。受信アンテナの灯だけが点滅している。ときどき空から信号が降りてきて、届いて、それきり ----
+// ---- 廃墟の街。受信アンテナの灯だけが点滅している。空から信号が1つ降りてきて、届く ----
+export const RUINS_RECEIVE = 120;                 // 信号がアンテナに届くフレーム
 function drawRuins() {
   cv.style.cursor = 'default';
   const t = state.ruins.t, L = S.DISH_LIGHT;
   ctx.drawImage(S.ruinsSprite(), 0, 0, CFG.W, CFG.H);
-  // 空から降りてくる信号（母船からの呼びかけの名残）
-  const P = 300, k = t % P;
+  // 空から降りてくる信号（母船の最後の呼びかけ）。1回きり
+  const k = t;
   let flashT = 999;
-  if (k < 120) {
-    const u = k / 120, sx = 900, sy = -20;
+  if (k < RUINS_RECEIVE) {
+    const u = k / RUINS_RECEIVE, sx = 900, sy = -20;
     const x = sx + (L.x - sx) * u, y = sy + (L.y - sy) * u;
     ctx.globalAlpha = 0.6; ctx.strokeStyle = '#9fe8ff'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(x, y, 6 + (k % 20), 0, 7); ctx.stroke();
     ctx.fillStyle = '#e8fbff'; ctx.beginPath(); ctx.arc(x, y, 2.5, 0, 7); ctx.fill();
-  } else flashT = k - 120;
+  } else flashT = k - RUINS_RECEIVE;
   // アンテナの灯：いつもはゆっくり点滅、信号が届いた直後だけ明るい
   const base = 0.3 + 0.5 * Math.max(0, Math.sin(t * 0.06));
   const flash = flashT < 30 ? 1 - flashT / 30 : 0;
@@ -742,6 +743,9 @@ function drawRuins() {
     ctx.beginPath(); ctx.arc(L.x, L.y, 12 + (1 - flash) * 50, 0, 7); ctx.stroke();
   }
   ctx.globalAlpha = 1;
-  // フェードイン
+  // 受け取った呼びかけ（「オウトウ・・・セヨ・・・」）
+  drawStoryText();
+  // フェードイン／終わりの暗転
   if (t < 60) { ctx.globalAlpha = 1 - t / 60; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, CFG.W, CFG.H); ctx.globalAlpha = 1; }
+  if (state.ruins.fade) { ctx.globalAlpha = Math.min(1, state.ruins.fade / 120); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, CFG.W, CFG.H); ctx.globalAlpha = 1; }
 }

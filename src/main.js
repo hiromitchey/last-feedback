@@ -6,13 +6,14 @@ import * as sched from './sched.js';
 import { movePlayer, shoot, fireBomb } from './player.js';
 import { moveBoss } from './boss.js';
 import { moveMid } from './midboss.js';
-import { moveStory, resetHullNumbers } from './story.js';
+import { moveStory, resetHullNumbers, showLine } from './story.js';
+import { STORY } from './text.js';
 import { moveBullets, moveLasers, movePhrases } from './bullets.js';
 import { moveEnemies } from './enemies.js';
 import { moveItems } from './items.js';
 import { moveWarnings, startStage } from './formation.js';
 import { collide } from './collide.js';
-import { initRender, render, onPlanet, ZOOM_FRAMES } from './render.js';
+import { initRender, render, onPlanet, ZOOM_FRAMES, RUINS_RECEIVE } from './render.js';
 import { prebuild } from './sprites.js';
 import { dbg, handleKey, tickFps, drawDebug } from './debug.js';
 import { sim } from './autoplay.js';
@@ -133,8 +134,13 @@ function step() {
       // 最後の一枚。説明はしない。惑星を触ると、夜側の灯へズームして廃墟の街へ。ほかを触ればタイトルへ
       state.endT++;
       if (state.ruins) {
-        state.ruins.t++;
-        if (state.ruins.t > 90 && input.tapped) toTitle();
+        // 信号が1つ届く → 「オウトウ・・・セヨ・・・」が流れる → 暗くなって終わり
+        const R = state.ruins;
+        R.t++;
+        if (R.t === RUINS_RECEIVE + 40) showLine([STORY.finalCall], { y: CFG.H - 40, size: 20, now: true, type: 9 });
+        if (R.t > RUINS_RECEIVE + 40 && !state.logLine && !R.fade) R.fade = 1;
+        if (R.fade && ++R.fade > 150) toTitle();
+        else if (R.t > 90 && input.tapped) toTitle();
       } else if (state.zoom) {
         if (++state.zoom.t >= ZOOM_FRAMES) { state.zoom = null; state.ruins = { t: 0 }; }
       } else if (state.endT > 150 && input.tapped) {

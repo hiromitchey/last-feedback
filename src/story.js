@@ -168,4 +168,5 @@ export function* afterBoss(b) {
   yield* sched.wait(90);
   state.mode = 'ending';
   state.endT = 0;
+  state.blackout = null;                     // 最後の一枚は自分でフェードインする
 }
