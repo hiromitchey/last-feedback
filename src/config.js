@@ -53,6 +53,20 @@ export const CFG = {
   },
 
   laser: { warn: 80, fire: 40, width: 36, minGap: 80 },
+
+  boss: {
+    // 体力は設計書の約2.2倍。強化2系統（W/P）の最大火力が設計書の G4 の約2倍になるため（PLAN.md）
+    body: 6600, core: 1300, coreOffsetY: 90, bodyR: 64, coreR: 30,
+    x: 760, formThresholds: [4400, 2200],
+    cap: [20, 25, 30],                                  // 形態ごとの同時弾上限
+    weaken: [[30 * 60, 1.3], [45 * 60, 1.6], [60 * 60, 2.0]],   // 形態3が長引くと発射間隔が伸びる
+    coreScore: 5000, formBonus: 8000, killScore: 20000,
+    timeBonus: { full: 20000, within: 90, perSec: 200 },
+  },
+
+  bomb: { max: 6, invincible: 120, enemyDmg: 30, bossDmg: 80 },
+  autoBomb: true,             // 被弾の瞬間、ボムが残っていれば自動で発動して打ち消す（既定ON）
+  continueCount: 10,          // CONTINUE? のカウント（秒）
   orb: { hpMid: 8, hpBoss: 20, rMid: 14, rBoss: 18, speed: 1.4, slowSpeed: 1.2, kakera: 3, kakeraBoss: 5 },
 
   item: { r: 10, pickR: 30, drift: 1.2, life: 60 * 12 },

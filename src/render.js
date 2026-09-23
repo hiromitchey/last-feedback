@@ -109,6 +109,7 @@ export function render(debug) {
     if (e.carry) blit(S.itemSprite(e.carry), e.x + e.r * 0.6, e.y - e.r - 8, 0, 0.62);
     if (e.glow > 0) drawCharge(e);
   }
+  drawBoss();
   // レーザー（弾より下）
   for (const w of state.laserWarns) {
     ctx.globalAlpha = 0.35 + 0.35 * ((w.t >> 3) & 1);
@@ -157,8 +158,39 @@ export function render(debug) {
     ctx.globalAlpha = 1;
   }
   if (debug?.hitbox) drawHitboxes();
+  if (state.bossWarn > 0 && (state.bossWarn >> 3) & 1) {
+    ctx.fillStyle = 'rgba(255,92,138,.18)'; ctx.fillRect(0, CFG.H / 2 - 50, CFG.W, 100);
+    text('WARNING', CFG.W / 2, CFG.H / 2, 64, '#FF5C8A', 'center', '#fff');
+  }
   if (state.mode === 'pause') overlay('PAUSE', 'クリック / タップ / Z でつづける');
-  if (state.mode === 'over') overlay('GAME OVER', 'クリック / タップ / Z でもういちど');
+  if (state.mode === 'continue') {
+    const n = Math.max(0, Math.ceil(state.contT / 60) - 1);
+    overlay('CONTINUE?', n + '　　クリック / タップ / Z でつづける');
+  }
+  if (state.mode === 'clear') {
+    const r = state.bossResult;
+    overlay('CLEAR（仮）', 'SCORE ' + Math.floor(state.score) + (r ? '　撃破 ' + r.sec.toFixed(1) + '秒' : '') + '　クリック / タップでタイトルへ');
+  }
+}
+
+function drawBoss() {
+  const b = state.boss;
+  if (!b) return;
+  // 撃破中は灯が消えていくように暗くする
+  if (b.dying) ctx.globalAlpha = Math.max(0.25, 1 - b.dying / 240);
+  const jit = b.trans > 0 ? Math.sin(b.trans * 0.8) * 6 : 0;   // のけぞり
+  if (b.hitFlash) ctx.globalAlpha *= 0.75;
+  blit(S.bossSprite(b.form), b.x + jit + 20, b.y);
+  ctx.globalAlpha = 1;
+  // 部位（本体の手前。狙える対象は見えていなければならない）
+  for (const p of b.parts) {
+    if (p.dead) continue;
+    const ratio = p.hp / p.maxhp;
+    const crack = ratio > 0.75 ? 0 : ratio > 0.5 ? 1 : ratio > 0.25 ? 2 : 3;
+    blit(S.coreSprite(p.which, crack), p.x + jit, p.y, 0, p.hitFlash ? 1.08 : 1);
+    if (p.glow > 0) drawCharge(p);
+  }
+  if (b.glow > 0) drawCharge({ x: b.x - 40, y: b.y, r: 40, glow: b.glow });
 }
 
 function drawCharge(e) {
@@ -188,6 +220,13 @@ function drawPlayer() {
   ctx.fillStyle = 'rgba(255,92,138,.85)';
   ctx.beginPath(); ctx.arc(p.x, p.y, 2.5, 0, 7); ctx.fill();
   drawEnergy(p);
+  if (state.bombFx > 0) {
+    const t = 1 - state.bombFx / 40;
+    ctx.globalAlpha = 1 - t;
+    ctx.strokeStyle = COL.ORANGE; ctx.lineWidth = 10;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 30 + t * 700, 0, 7); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
 }
 
 // 【試験】エネルギーゲージ：自機の真下。満タンなら出さない
@@ -244,6 +283,23 @@ function drawHUD() {
   row('P', 'pow', '#F0503C', CFG.H - 24, '×' + S2.powMul[p.lv.pow].toFixed(1) + (p.lv.pow >= S2.pierceAt ? ' 貫通' : ''));
   if (state.seg) text(state.seg.name, CFG.W / 2, 24, 16, '#cfd6ff');
   if (state.autoShot) text('AUTO', CFG.W - 20, 24, 14, COL.AQUA, 'right');
+  text('B×' + p.bombs, 200, CFG.H - 37, 18, '#FF9E3D', 'left');
+  // ボスの体力（形態の区切り付き）とコア
+  const b = state.boss;
+  if (b && !b.entering) {
+    const x = 300, y = 52, w = 360, h = 10;
+    ctx.fillStyle = '#fff'; ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
+    ctx.fillStyle = '#2a2140'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = ['#B388FF', '#4FC3F7', '#FF5C8A'][b.form - 1];
+    ctx.fillRect(x, y, w * Math.max(0, b.hp) / b.maxhp, h);
+    ctx.fillStyle = '#fff';
+    for (const t of b.th) ctx.fillRect(x + w * t / b.maxhp - 1, y - 2, 2, h + 4);
+    b.parts.forEach((p, i) => {
+      const cx = x + w + 20 + i * 22;
+      ctx.fillStyle = p.dead ? '#444' : (i === 0 ? COL.PINK : COL.CYAN);
+      ctx.beginPath(); ctx.arc(cx, y + h / 2, 7, 0, 7); ctx.fill();
+    });
+  }
 }
 
 function drawTouchUI() {
@@ -264,7 +320,7 @@ function drawTitle() {
   if ((state.frame >> 5) & 1)
     text('クリック / タップ / Z ではじめる', CFG.W / 2, CFG.H / 2 + 40, 22, '#FFD54F');
   const help = [
-    'マウス：追従・左で撃つ　キー：矢印で移動・Zで撃つ・Shiftで低速',
+    'マウス：追従・左で撃つ・右でボム　キー：矢印で移動・Zで撃つ・Xでボム・Shiftで低速',
     'タッチ：ドラッグで移動・右下で撃つ　Q / AUTO：オートショット切替　F9：エネルギー切替（試験）',
   ];
   help.forEach((s, i) => text(s, CFG.W / 2, CFG.H - 70 + i * 26, 15, '#cfd6ff'));
@@ -284,6 +340,9 @@ function drawHitboxes() {
   for (const b of state.pBullets) circle(b.x, b.y, 5, '#0f0');
   for (const it of state.items) circle(it.x, it.y, CFG.item.pickR, 'rgba(0,255,255,.4)');
   circle(state.player.x, state.player.y, CFG.player.r, '#0ff');
+  const b = state.boss;
+  if (b) { circle(b.x, b.y, b.r, '#f0f'); for (const p of b.parts) if (!p.dead) circle(p.x, p.y, p.r, '#f0f'); }
+  for (const l of state.lasers) { ctx.strokeStyle = '#ff0'; ctx.strokeRect(0, l.y - l.w * 0.34, CFG.W, l.w * 0.68); }
   ctx.strokeStyle = 'rgba(255,255,255,.3)';
   ctx.beginPath(); ctx.moveTo(CFG.player.xMax, 0); ctx.lineTo(CFG.player.xMax, CFG.H); ctx.stroke();
 }

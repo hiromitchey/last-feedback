@@ -201,6 +201,113 @@ export function mokoSprite() {
   return c;
 }
 
+// ---- ボス（左向き）：形態ごとに1枚。物語：自己改良の地層 ----
+// 形態1 元の姿に近い・きれい / 形態2 継ぎ接ぎが増える / 形態3 原型をとどめていない
+// 上下 ±90px にコア（コードで描く）が乗るので、上下に腕を出しておく
+export function bossSprite(form) {
+  const k = 'boss|' + form;
+  let c = cache.get(k);
+  if (c) return c;
+  const W = 260, H = 300, m = { x: W / 2, y: H / 2 };
+  c = mk(W, H, g => {
+    g.lineJoin = 'round';
+    const body = form === 1 ? '#E8ECF4' : form === 2 ? '#d5d2dc' : '#a79fb3';
+    const dark = form === 3 ? '#4a3d5c' : '#5a6a88';
+    // 上下の腕（コアの台座）
+    const arm = sy => {
+      g.beginPath();
+      g.moveTo(m.x + 30, m.y + sy * 30);
+      g.quadraticCurveTo(m.x + 10, m.y + sy * 95, m.x - 30, m.y + sy * 110);
+      g.lineTo(m.x - 60, m.y + sy * 92);
+      g.quadraticCurveTo(m.x - 20, m.y + sy * 70, m.x - 20, m.y + sy * 25);
+      g.closePath();
+    };
+    for (const sy of [-1, 1]) {
+      arm(sy); g.strokeStyle = '#fff'; g.lineWidth = 9; g.stroke();
+      g.fillStyle = form === 3 && sy > 0 ? '#8d8398' : body; g.fill();
+    }
+    // 本体：左向きの流線形
+    const hull = () => {
+      g.beginPath();
+      g.moveTo(m.x - 118, m.y);
+      g.quadraticCurveTo(m.x - 90, m.y - 62, m.x + 10, m.y - 66);
+      g.quadraticCurveTo(m.x + 100, m.y - 60, m.x + 112, m.y - 20);
+      g.lineTo(m.x + 112, m.y + 20);
+      g.quadraticCurveTo(m.x + 100, m.y + 60, m.x + 10, m.y + 66);
+      g.quadraticCurveTo(m.x - 90, m.y + 62, m.x - 118, m.y);
+      g.closePath();
+    };
+    hull(); g.strokeStyle = '#fff'; g.lineWidth = 10; g.stroke();
+    g.fillStyle = body; g.fill();
+    // 元の意匠：047 と同じ窓と帯（同じ作り手の証）
+    g.fillStyle = dark;
+    g.fillRect(m.x - 60, m.y + 14, 150, 12);
+    g.fillStyle = '#4FC3F7';
+    g.beginPath(); g.ellipse(m.x - 55, m.y - 14, 34, 20, 0, 0, 7); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.85)';
+    g.beginPath(); g.ellipse(m.x - 66, m.y - 22, 11, 6, 0, 0, 7); g.fill();
+    // 後ろのスラスター
+    g.fillStyle = dark;
+    for (const y of [-34, 0, 34]) { g.fillRect(m.x + 104, m.y + y - 8, 18, 16); }
+    if (form >= 2) {
+      // 継ぎ接ぎ：色の合わない板とボルト
+      const patch = (x, y, w, h, col, rot) => {
+        g.save(); g.translate(m.x + x, m.y + y); g.rotate(rot);
+        g.fillStyle = col; g.fillRect(-w / 2, -h / 2, w, h);
+        g.fillStyle = '#e6e0ff';
+        for (const [px, py] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { g.beginPath(); g.arc(px * (w / 2 - 4), py * (h / 2 - 4), 2.2, 0, 7); g.fill(); }
+        g.restore();
+      };
+      patch(20, -40, 46, 26, '#a0875e', 0.1);
+      patch(60, 36, 40, 22, '#5c6b7a', -0.15);
+      patch(-10, 88, 30, 20, '#8a6f9e', 0.3);
+      if (form === 3) {
+        patch(-20, -2, 54, 30, '#6d5c4a', -0.25);
+        patch(40, -80, 36, 24, '#556070', 0.4);
+        patch(-90, 20, 28, 34, '#7a6a55', 0.2);
+      }
+    }
+    if (form === 3) {
+      // 窓の割れ、はみ出した配線、欠けた装甲
+      g.strokeStyle = '#2a2140'; g.lineWidth = 2.5;
+      g.beginPath(); g.moveTo(m.x - 70, m.y - 28); g.lineTo(m.x - 52, m.y - 12); g.lineTo(m.x - 40, m.y - 24); g.stroke();
+      g.strokeStyle = '#FFD54F'; g.lineWidth = 3; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(m.x + 70, m.y + 50); g.quadraticCurveTo(m.x + 100, m.y + 90, m.x + 70, m.y + 110); g.stroke();
+      g.strokeStyle = '#FF5C8A';
+      g.beginPath(); g.moveTo(m.x + 90, m.y - 44); g.quadraticCurveTo(m.x + 130, m.y - 60, m.x + 118, m.y - 96); g.stroke();
+      g.fillStyle = '#171a2e';
+      g.beginPath(); g.moveTo(m.x + 30, m.y + 66); g.lineTo(m.x + 50, m.y + 48); g.lineTo(m.x + 70, m.y + 62); g.closePath(); g.fill();
+    }
+  });
+  cache.set(k, c);
+  return c;
+}
+
+// コア（部位）：白フチ + 原色 + 中心の光。HPでヒビ
+export function coreSprite(which, crack) {
+  const k = 'core|' + which + '|' + crack;
+  let c = cache.get(k);
+  if (c) return c;
+  const r = CFG.boss.coreR, d = (r + 8) * 2, m = d / 2;
+  const col = which === 'upper' ? COL.PINK : COL.CYAN;
+  c = mk(d, d, g => {
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(m, m, r + 5, 0, 7); g.fill();
+    g.fillStyle = '#2a2140'; g.beginPath(); g.arc(m, m, r, 0, 7); g.fill();
+    g.fillStyle = col; g.beginPath(); g.arc(m, m, r - 5, 0, 7); g.fill();
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(m, m, r * 0.32, 0, 7); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.8)';
+    g.beginPath(); g.ellipse(m - r * 0.4, m - r * 0.45, r * 0.22, r * 0.12, -0.6, 0, 7); g.fill();
+    if (crack) {
+      g.strokeStyle = '#2a2140'; g.lineWidth = 2.5; g.lineCap = 'round';
+      for (const [x1, y1, x2, y2] of CRACKS[crack]) {
+        g.beginPath(); g.moveTo(m + x1 * r, m + y1 * r); g.lineTo(m + x2 * r, m + y2 * r); g.stroke();
+      }
+    }
+  });
+  cache.set(k, c);
+  return c;
+}
+
 // ---- アイテム ----
 export function itemSprite(kind) {
   const k = 'i|' + kind;
@@ -240,5 +347,7 @@ export function prebuild() {
   puniSprite();
   for (const k of ['way', 'pow', 'kakera', 'bomb']) itemSprite(k);
   mokoSprite(); byunSprite();
+  for (let f = 1; f <= 3; f++) bossSprite(f);
+  for (const w of ['upper', 'lower']) for (let cr = 0; cr < 4; cr++) coreSprite(w, cr);
   return cache.size;
 }

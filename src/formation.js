@@ -4,6 +4,7 @@ import { state, popup } from './world.js';
 import * as sched from './sched.js';
 import { spawnEnemy } from './enemies.js';
 import { bigOrb } from './bullets.js';
+import { bossFight, skipForm } from './boss.js';
 
 function warn(ys) {
   for (const y of ys) state.warnings.push({ y, t: CFG.warn.spawn, alive: true });
@@ -133,7 +134,7 @@ function* segmentA() {
   yield* sched.wait(70);
   yield* formation('波', 6, { y0: 200, amp: 80, phase: Math.PI });
   yield* sched.waitCleared(20);
-  yield* formation('階段', 5, { y0: 90, dy: 85, shoot: true });
+  yield* formation('階段', 5, { y0: 90, dy: 85, shoot: true, carry: [4, 'bomb'] });   // ボム1個
   yield* sched.wait(60);
   yield* formation('階段', 5, { y0: 450, dy: -85 });
   yield* sched.waitCleared(20);
@@ -166,7 +167,7 @@ function* segmentB() {
   yield* sched.wait(70);
   yield* formation('連なり', 6, { y: MID, shoot: true });
   yield* sched.wait(40);
-  yield* formation('挟み', 4, {});
+  yield* formation('挟み', 4, { carry: [2, 'bomb'] });   // ボム1個
   yield* sched.waitCleared(20);
   yield* formation('玉の雨', 3, { ys: [110, MID, 430], gap: 45 });
   yield* sched.wait(40);
@@ -203,11 +204,13 @@ export const SEGMENTS = [
   { name: '道中B', gen: segmentB },
 ];
 
-function* stage(startIdx) {
-  for (let idx = startIdx; ; idx = (idx + 1) % SEGMENTS.length) {
+function* stage(startIdx, bossForm, cores) {
+  for (let idx = startIdx; idx < SEGMENTS.length; idx++) {
     const S = SEGMENTS[idx];
     state.seg = { index: idx, name: S.name, t0: state.frame, escaped: 0 };
     state.segCap = CFG.seg.cap[idx];
+    // チェックポイント：死んだら区間の頭から
+    state.checkpoint = { seg: idx, lv: { ...state.player.lv } };
     popup(S.name, CFG.W / 2, CFG.H / 2 - 30, { big: true, size: 48, col: '#fff', life: 90 });
     yield* S.gen();
     // 区間の切り替えは「全滅」かつ「最低時間の経過」
@@ -218,26 +221,28 @@ function* stage(startIdx) {
       popup('撃ち漏らしゼロ！ +' + CFG.seg.zeroMissBonus, CFG.W / 2, CFG.H / 2, { big: true, size: 36, col: '#FFD54F', life: 90 });
       yield* sched.wait(90);
     }
-    if (idx === SEGMENTS.length - 1) {
-      // ボス（Step 13・14）ができるまでは道中Aに戻る。強化は持ち越し
-      popup('この先はボス（準備中）', CFG.W / 2, CFG.H / 2, { big: true, size: 32, col: '#fff', life: 150 });
-      yield* sched.wait(180);
-    }
   }
+  yield* bossFight(bossForm, cores);
+  yield* sched.wait(60);
+  state.mode = 'clear';
+  state.clearT = 0;
 }
 
 let token = null;
-export function startStage(idx = 0) {
+// idx: 0 道中A / 1 道中B / 'boss'
+export function startStage(idx = 0, bossForm = 1, cores = null) {
   if (token) token.alive = false;
   token = { alive: true };
-  sched.add(stage(idx), token);
+  sched.add(stage(idx === 'boss' ? SEGMENTS.length : idx, bossForm, cores), token);
 }
 
-// F4：次の区間へ飛ばす
+// F4：次の区間へ（ボス戦中は次の形態へ）
 export function skipSegment() {
-  const next = state.seg ? (state.seg.index + 1) % SEGMENTS.length : 0;
+  if (state.boss) { skipForm(); return; }
+  if (state.seg && state.seg.index >= SEGMENTS.length) return;   // 警告中
+  const next = state.seg ? state.seg.index + 1 : 0;
   for (const e of state.enemies) e.alive = false;
   for (const b of state.eBullets) b.alive = false;
   state.warnings.length = 0;
-  startStage(next);
+  startStage(next >= SEGMENTS.length ? 'boss' : next);
 }

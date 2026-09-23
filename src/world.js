@@ -53,6 +53,11 @@ export function resetWorld() {
   state.boss = null;
   state.seg = null;
   state.segCap = null;
+  state.checkpoint = null;   // コンティニューで戻る場所 { seg: 0|1|'boss', form, lv, cores }
+  state.bossWarn = 0;
+  state.bombFx = 0;
+  state.bossResult = null;
+  state.autoBomb = CFG.autoBomb;
   for (const p of particles) p.alive = false;
 }
 

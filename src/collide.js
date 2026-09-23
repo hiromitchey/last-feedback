@@ -2,6 +2,7 @@
 import { CFG } from './config.js';
 import { state, spawnParticle, popup } from './world.js';
 import { damageEnemy } from './enemies.js';
+import { bossTargetable, damagePart, damageBoss } from './boss.js';
 import { damagePlayer, gainLevel } from './player.js';
 import { scatter } from './items.js';
 import { fxRng } from './rng.js';
@@ -40,7 +41,7 @@ function hitOrbs(b) {
   return false;
 }
 
-function breakOrb(o) {
+export function breakOrb(o) {
   o.alive = false;
   state.score += CFG.score.orb;
   scatter('kakera', o.boss ? CFG.orb.kakeraBoss : CFG.orb.kakera, o.x, o.y, 1.6, 3.2);
@@ -53,6 +54,25 @@ function breakOrb(o) {
   }
   state.shake = Math.max(state.shake, 4);
   popup('パキーン！', o.x, o.y - 16, { size: 28, col: '#FFD54F', life: 45 });
+}
+
+// 部位 → 本体。部位が生きていれば、部位に当たった弾はそこで吸われる
+function hitBoss(b) {
+  if (!bossTargetable()) return false;
+  const boss = state.boss;
+  for (const p of boss.parts) {
+    if (p.dead) continue;
+    checks++;
+    if (!hit(b, p, PB_R, p.r) || !consume(b, p)) continue;
+    damagePart(p, b.dmg);
+    if (!b.alive) return true;
+  }
+  checks++;
+  if (hit(b, boss, PB_R, boss.r) && consume(b, boss)) {
+    damageBoss(b.dmg);
+    return !b.alive;
+  }
+  return false;
 }
 
 function hitEnemies(b) {
@@ -70,10 +90,11 @@ export function collide() {
   checks = 0;
   const p = state.player;
 
-  // 1. 自弾 → でか玉 → (ボス部位 → ボス本体: Step 13) → 敵
+  // 1. 自弾 → でか玉 → ボス部位 → ボス本体 → 敵
   for (const b of state.pBullets) {
     if (!b.alive) continue;
     if (hitOrbs(b)) continue;
+    if (hitBoss(b)) continue;
     hitEnemies(b);
   }
 
@@ -114,7 +135,8 @@ export function collide() {
         if (p.empty) p.lockT -= EN.kakeraLock;
       }
     } else if (it.kind === 'bomb') {
-      p.bombs = Math.min(p.bombs + 1, 6);
+      p.bombs = Math.min(p.bombs + 1, CFG.bomb.max);
+      popup('ボム +1', it.x, it.y - 12, { size: 16, col: '#FF9E3D', life: 30 });
     }
   }
 }

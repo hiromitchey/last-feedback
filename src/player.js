@@ -4,6 +4,9 @@ import { state, popup, flash, spawnParticle, nextId } from './world.js';
 import { input, held, BTN } from './input.js';
 import { scatter } from './items.js';
 import { fxRng } from './rng.js';
+import { damageEnemy } from './enemies.js';
+import { breakOrb } from './collide.js';
+import { bombBoss } from './boss.js';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
@@ -107,10 +110,31 @@ function levelUpFx(p, kind) {
   popup(sub, CFG.W / 2, CFG.H / 2 + 38, { big: true, size: 30, col: '#fff', life: 70 });
 }
 
+// ボム：敵弾とレーザーを消し、でか玉を割り、画面の敵とボスにダメージ。しばらく無敵
+export function fireBomb(auto = false) {
+  const p = state.player;
+  if (p.bombs <= 0) return false;
+  p.bombs--;
+  const BM = CFG.bomb;
+  p.invincible = Math.max(p.invincible, BM.invincible);
+  for (const b of state.eBullets) { if (b.hp && b.alive) breakOrb(b); else b.alive = false; }
+  for (const l of state.lasers) l.alive = false;
+  for (const w of state.laserWarns) w.alive = false;
+  if (state.boss) state.boss.pendingLaser = null;
+  for (const e of state.enemies) if (e.alive && e.x < CFG.W + 10) damageEnemy(e, BM.enemyDmg);
+  bombBoss(BM.bossDmg);
+  flash('#fff', 20);
+  state.shake = 10;
+  state.bombFx = 40;
+  popup(auto ? 'オートボム！' : 'ボム！', p.x, p.y - 40, { size: 26, col: '#FF9E3D', life: 50 });
+  return true;
+}
+
 export function damagePlayer() {
   const p = state.player;
   if (p.invincible > 0 || state.debugInvincible) return;
-  // オートボム（Step 14）はここ。被弾を確定させる前にボムを見る
+  // オートボム：被弾を確定させる前にボムを見る（確定してから取り消すと演出が二重に走る）
+  if (state.autoBomb && fireBomb(true)) return;
   p.lives--;
   p.invincible = CFG.player.invincible;
   state.shake = 14;
@@ -129,5 +153,6 @@ export function damagePlayer() {
   // 前（右）へ散らす。左へ流れて戻ってくるので無敵中に拾える
   scatter(kind, CFG.scatterOnHit, p.x + 20, p.y, 2.0, 4.5, 0);
   popup('ドカーン！', p.x, p.y - 30, { col: '#FF5C8A', size: 28, life: 50 });
-  if (p.lives < 0) { p.dead = true; state.mode = 'over'; state.overT = 0; }
+  // 残機が尽きたら CONTINUE?（回数制限なし。物語を最後まで見せる）
+  if (p.lives < 0) { p.lives = 0; state.mode = 'continue'; state.contT = CFG.continueCount * 60; }
 }

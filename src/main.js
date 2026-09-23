@@ -3,7 +3,8 @@ import { CFG, DEBUG } from './config.js';
 import { state, resetWorld, sweep, moveParticles, movePopups } from './world.js';
 import { input, initInput, sample, pressed, syncTarget, BTN } from './input.js';
 import * as sched from './sched.js';
-import { movePlayer, shoot } from './player.js';
+import { movePlayer, shoot, fireBomb } from './player.js';
+import { moveBoss } from './boss.js';
 import { moveBullets, moveLasers } from './bullets.js';
 import { moveEnemies } from './enemies.js';
 import { moveItems } from './items.js';
@@ -27,15 +28,41 @@ function startGame() {
   state.mode = 'play';
 }
 
+// コンティニュー：回数制限なし。死んだ区間の頭から（ボス戦なら形態の頭から）。スコアはリセット
+function doContinue() {
+  const cp = state.checkpoint || { seg: 0, lv: { way: 0, pow: 0 } };
+  for (const a of [state.enemies, state.eBullets, state.pBullets, state.items, state.warnings, state.lasers, state.laserWarns]) a.length = 0;
+  state.boss = null;
+  state.bossWarn = 0;
+  sched.clear();
+  const p = state.player;
+  p.lives = state.diff.lives; p.bombs = state.diff.bombs;
+  p.invincible = 120; p.energy = CFG.energy.max; p.empty = false;
+  p.lv = { ...cp.lv }; p.stock = { way: 0, pow: 0 };
+  // ボス戦で力尽きたら強化は最低でも W3/P3 で復帰（設計書：G3で復帰）
+  if (cp.seg === 'boss') { p.lv.way = Math.max(p.lv.way, 2); p.lv.pow = Math.max(p.lv.pow, 2); }
+  state.score = 0;
+  startStage(cp.seg, cp.form ?? 1, cp.cores ?? null);
+  state.mode = 'play';
+}
+
+function toTitle() {
+  sched.clear();
+  resetWorld();
+  state.mode = 'title';
+}
+
 function stepPlay() {
   sched.step();                 // 出現・発射
   movePlayer();
+  if (pressed(BTN.BOMB)) fireBomb();
   shoot();
   moveBullets();
   moveEnemies();
   moveItems();
   moveWarnings();
   moveLasers();
+  moveBoss();
   collide();                    // 撃破が先、被弾が後
   sweep(state.enemies);
   sweep(state.eBullets);
@@ -65,9 +92,14 @@ function step() {
     case 'pause':
       if (pressed(BTN.PAUSE) || input.tapped) state.mode = 'play';
       break;
-    case 'over':
-      state.overT++;
-      if (state.overT > 60 && input.tapped) startGame();
+    case 'continue':
+      state.contT--;
+      if (state.contT < CFG.continueCount * 60 - 30 && input.tapped) doContinue();
+      else if (state.contT <= 0) toTitle();
+      break;
+    case 'clear':
+      state.clearT++;
+      if (state.clearT > 90 && input.tapped) toTitle();
       break;
   }
   input.tapped = false;
@@ -78,6 +110,7 @@ function step() {
     sweep(state.popups);
     if (state.flash && --state.flash.t <= 0) state.flash = null;
     if (state.shake > 0) state.shake = Math.max(0, state.shake - 1);
+    if (state.bombFx > 0) state.bombFx--;
   }
 }
 
