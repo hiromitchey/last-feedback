@@ -1,6 +1,6 @@
 // 起動・ループ・状態機械（技術設計書 2章）
 import { CFG, DEBUG } from './config.js';
-import { state, resetWorld, sweep, moveParticles, movePopups } from './world.js';
+import { state, resetWorld, sweep, moveParticles, movePopups, moveBooms } from './world.js';
 import { input, initInput, sample, pressed, syncTarget, BTN } from './input.js';
 import * as sched from './sched.js';
 import { movePlayer, shoot, fireBomb } from './player.js';
@@ -119,6 +119,8 @@ function step() {
   if (state.mode !== 'pause') {
     moveParticles();
     movePopups();
+    moveBooms();
+    sweep(state.booms);
     moveStory();
     if (state.blackout) state.blackout.t++;
     sweep(state.popups);

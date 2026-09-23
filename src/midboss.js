@@ -1,7 +1,7 @@
 // 中ボス：壊れてから生まれた歪んだもの。面を追うごとに歪む
 // 倒すと、抱えていた母船の記録（メッセージ）が出る。メッセージが出るのはここだけ
 import { CFG, COL } from './config.js';
-import { state, spawnParticle } from './world.js';
+import { state, spawnParticle, explode, flash } from './world.js';
 import * as sched from './sched.js';
 import { needle, ring, fan, bigOrb, phrase } from './bullets.js';
 import { spawnItem } from './items.js';
@@ -209,7 +209,8 @@ export function moveMid() {
   if (m.hitFlash) m.hitFlash--;
   if (m.dying) {
     m.dying++;
-    if (m.dying % 8 === 0) crumble(m, 8);
+    if (m.dying % 7 === 0 && m.dying < 42) explode(m.x + fxRng.range(-50, 50), m.y + fxRng.range(-50, 50), 30 + fxRng.rnd() * 30);
+    if (m.dying === 45) { explode(m.x, m.y, 110); flash('#fff', 16); }
     return;
   }
   if (m.glitch > 0) m.glitch--;
@@ -249,7 +250,7 @@ export function damageMid(dmg) {
     for (const b of state.eBullets) b.alive = false;
     for (const q of state.phrases) q.alive = false;
     state.score += CFG.midboss.score;
-    crumble(m, 40);
+    explode(m.x, m.y, 50);
   }
 }
 

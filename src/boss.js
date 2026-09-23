@@ -337,6 +337,7 @@ function startDying(b) {
   b.hp = 0;
   b.dying = 1;
   b.weakenRate = 1;
+  b.repair = null; b.drawForm = b.form; b.trans = 0;   // 直している途中でも打ち切る
   if (b.body) b.body.alive = false;
   for (const p of b.parts) p.dead = true;
   clearDanger();

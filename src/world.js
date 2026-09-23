@@ -1,5 +1,6 @@
 // 状態の箱・リセット・掃除・パーティクルのプール（技術設計書 3〜4章）
 import { CFG } from './config.js';
+import { fxRng } from './rng.js';
 
 export const state = {
   mode: 'title',            // title | play | pause | over
@@ -19,6 +20,7 @@ export const state = {
   phrases: [],              // ボスの声（言葉のかたまり）とビーム
   laserWarns: [],           // レーザーの予告線
   popups: [],
+  booms: [],                // 爆発（見た目だけ）
   boss: null,
   seg: null,                // 道中の区間 { index, t, escaped }
   segCap: null,             // 区間ごとの同時弾上限
@@ -50,6 +52,7 @@ export function resetWorld() {
   state.phrases.length = 0;
   state.laserWarns.length = 0;
   state.popups.length = 0;
+  state.booms.length = 0;
   state.boss = null;
   state.seg = null;
   state.segCap = null;
@@ -124,3 +127,19 @@ export function movePopups() {
 }
 
 export function flash(col, t = 12) { state.flash = { col, t, max: t }; }
+
+// ---- 爆発：広がる火の玉＋リング＋火花（判定に関与しない） ----
+export function explode(x, y, size = 40) {
+  state.booms.push({ x, y, size, t: 0, max: 26 + size * 0.2, alive: true });
+  const n = Math.min(40, 8 + size * 0.5);
+  for (let i = 0; i < n; i++) {
+    const a = fxRng.rnd() * Math.PI * 2, s = 1 + fxRng.rnd() * size * 0.12;
+    spawnParticle(x, y, Math.cos(a) * s, Math.sin(a) * s, 20 + fxRng.rnd() * 30,
+      fxRng.pick(['#fff', '#FFD54F', '#FF9E3D', '#FF5C8A']), 3 + fxRng.rnd() * 5);
+  }
+  state.shake = Math.max(state.shake, Math.min(22, size * 0.2));
+}
+
+export function moveBooms() {
+  for (const b of state.booms) if (++b.t >= b.max) b.alive = false;
+}

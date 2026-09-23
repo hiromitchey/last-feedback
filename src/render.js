@@ -129,6 +129,7 @@ export function render(debug) {
   }
   drawBoss();
   drawMid();
+  drawBooms();                  // 爆発はボスより手前
   // レーザー（弾より下）
   for (const w of state.laserWarns) {
     ctx.globalAlpha = 0.35 + 0.35 * ((w.t >> 3) & 1);
@@ -223,6 +224,19 @@ function drawMid() {
   }
   ctx.globalAlpha = 1;
   if (m.glow > 0) drawCharge({ x: m.x - 20, y: m.y, r: 36, glow: m.glow });
+}
+
+// 爆発：白い芯 → 黄色 → オレンジの火の玉が広がって消える。外側にリング
+function drawBooms() {
+  for (const b of state.booms) {
+    const u = b.t / b.max, r = b.size * (0.3 + u * 0.9);
+    ctx.globalAlpha = 1 - u;
+    ctx.fillStyle = u < 0.2 ? '#fff' : u < 0.5 ? '#FFD54F' : '#FF9E3D';
+    ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(b.x, b.y, r * 1.35, 0, 7); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
 }
 
 // 化けた番号のちらつき：ときどき1文字が別の記号に入れ替わる（見た目だけ）

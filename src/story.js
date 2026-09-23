@@ -4,6 +4,8 @@ import { CFG } from './config.js';
 import { state } from './world.js';
 import * as sched from './sched.js';
 import { STORY } from './text.js';
+import { explode, flash } from './world.js';
+import { fxRng } from './rng.js';
 
 const TYPE = 4;       // タイプライター：1文字あたりのフレーム
 const PART_GAP = 45;  // 繰り返す行の、次の繰り返しまでの間
@@ -113,7 +115,17 @@ export const LIGHTS = 6;
 export function* afterBoss(b) {
   state.quiet = true;                        // 自機も撃たない。ずっと定型だった画面が、最後に黙る
   b.lights = LIGHTS;
-  yield* sched.wait(60);
+  // 爆発：船体のあちこちで連鎖 → 大爆発。そのあと焼け残った船体が黙る
+  for (let i = 0; i < 14; i++) {
+    explode(b.x + 20 + fxRng.range(-110, 110), b.y + fxRng.range(-110, 110), 40 + fxRng.rnd() * 40);
+    if (i % 4 === 3) flash('#fff', 6);
+    yield* sched.wait(8 + ((fxRng.rnd() * 8) | 0));
+  }
+  yield* sched.wait(20);
+  explode(b.x + 20, b.y, 160);
+  flash('#fff', 40);
+  b.burnt = true;
+  yield* sched.wait(80);
   while (b.lights > 0) { b.lights--; yield* sched.wait(40); }
   yield* sched.wait(90);                     // 静かになる
   state.logQueue.length = 0;
