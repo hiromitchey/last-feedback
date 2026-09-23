@@ -143,7 +143,7 @@ function step() {
     sweep(state.booms);
     moveSignals();
     sweep(state.signals);
-    if (state.mode === 'play') signalTick();
+    if (state.mode === 'play' || state.mode === 'title') signalTick();   // タイトルでも、返事のない呼びかけが飛んでいる
     sweep(state.debris);
     moveStory();
     if (state.blackout) state.blackout.t++;

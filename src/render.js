@@ -534,14 +534,15 @@ function drawTouchUI() {
 }
 
 function drawTitle() {
-  text('LAST FEEDBACK', CFG.W / 2, CFG.H / 2 - 50, 72, '#fff', 'center', '#FF5C8A');
+  // 静かで寂しい物語なので、明るい色は使わない。白に暗い青の縁取り
+  text('LAST FEEDBACK', CFG.W / 2, CFG.H / 2 - 50, 72, '#e8ecf4', 'center', '#1e2a44');
   if ((state.frame >> 5) & 1)
-    text('クリック / タップ / Z ではじめる', CFG.W / 2, CFG.H / 2 + 40, 22, '#FFD54F');
+    text('クリック / タップ / Z ではじめる', CFG.W / 2, CFG.H / 2 + 40, 20, '#9aa6c4', 'center', '#10152a');
   const help = [
     'マウス：追従・左で撃つ・右でボム　キー：矢印で移動・Zで撃つ・Xでボム・Shiftで低速',
     'タッチ：ドラッグで移動・右下で撃つ　Q / AUTO：オートショット切替　F9：エネルギー切替（試験）',
   ];
-  help.forEach((s, i) => text(s, CFG.W / 2, CFG.H - 70 + i * 26, 15, '#cfd6ff'));
+  help.forEach((s, i) => text(s, CFG.W / 2, CFG.H - 70 + i * 26, 15, '#7d88a6', 'center', '#10152a'));
 }
 
 function overlay(title, sub) {
