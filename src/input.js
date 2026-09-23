@@ -61,6 +61,7 @@ export function initInput(canvas) {
     e.preventDefault();
     input.tapped = true;
     const p = toLogical(e);
+    input.tapAt = p;                        // 触った場所（キーやパッドのときは null）
     if (e.pointerType === 'mouse') {
       input.mode = 'pointer';
       input.tx = p.x; input.ty = p.y;
@@ -110,7 +111,7 @@ export function initInput(canvas) {
     if (/^F\d+$/.test(e.code)) { e.preventDefault(); if (!e.repeat) input.fkeys.push(e.code); return; }
     if (e.code === 'Period') input.fkeys.push('Period');   // コマ送り（F5 中）
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
-    if (!e.repeat && (e.code === 'KeyZ' || e.code === 'Space' || e.code === 'Enter')) input.tapped = true;
+    if (!e.repeat && (e.code === 'KeyZ' || e.code === 'Space' || e.code === 'Enter')) { input.tapped = true; input.tapAt = null; }
     if (!e.repeat && e.code === 'KeyQ') input.toggleAuto = true;
     keys.add(e.code);
   });
@@ -131,7 +132,7 @@ function pollGamepad() {
   if (gp.buttons[0]?.pressed) padBtn |= BTN.SHOT;
   if (gp.buttons[1]?.pressed) padBtn |= BTN.BOMB;
   if (gp.buttons[9]?.pressed) padBtn |= BTN.PAUSE;
-  if (padBtn & BTN.SHOT && !(input.prevBtn & BTN.SHOT)) input.tapped = true;
+  if (padBtn & BTN.SHOT && !(input.prevBtn & BTN.SHOT)) { input.tapped = true; input.tapAt = null; }
   const dx = px || sx, dy = py || sy;
   if (dx || dy) { input.mode = 'dir'; input.dx = dx; input.dy = dy; return true; }
   return false;

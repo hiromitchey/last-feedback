@@ -75,6 +75,8 @@ export function resetWorld() {
   state.mid = null;          // 中ボス
   state.slowT = 0;           // 中ボス撃破のスロー
   state.warp = null;         // 面の区切りのワープ
+  state.zoom = null;         // 最後の一枚 → 惑星へズーム
+  state.ruins = null;        // 廃墟の街
   state.stage = 0;           // 面（0〜2）
   state.planet = 0.8;        // 奥の惑星の大きさ。面が進むほど近づく
   for (const p of particles) p.alive = false;

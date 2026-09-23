@@ -12,7 +12,7 @@ import { moveEnemies } from './enemies.js';
 import { moveItems } from './items.js';
 import { moveWarnings, startStage } from './formation.js';
 import { collide } from './collide.js';
-import { initRender, render } from './render.js';
+import { initRender, render, onPlanet, ZOOM_FRAMES } from './render.js';
 import { prebuild } from './sprites.js';
 import { dbg, handleKey, tickFps, drawDebug } from './debug.js';
 import { sim } from './autoplay.js';
@@ -130,9 +130,17 @@ function step() {
       else if (state.contT <= 0) toTitle();
       break;
     case 'ending':
-      // 最後の一枚。説明はしない。しばらくしたら触ればタイトルへ
+      // 最後の一枚。説明はしない。惑星を触ると、夜側の灯へズームして廃墟の街へ。ほかを触ればタイトルへ
       state.endT++;
-      if (state.endT > 240 && input.tapped) toTitle();
+      if (state.ruins) {
+        state.ruins.t++;
+        if (state.ruins.t > 90 && input.tapped) toTitle();
+      } else if (state.zoom) {
+        if (++state.zoom.t >= ZOOM_FRAMES) { state.zoom = null; state.ruins = { t: 0 }; }
+      } else if (state.endT > 150 && input.tapped) {
+        if (input.tapAt && onPlanet(input.tapAt)) state.zoom = { t: 0 };
+        else if (state.endT > 240) toTitle();
+      }
       break;
   }
   input.tapped = false;

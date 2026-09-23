@@ -546,6 +546,79 @@ export function planetSprite() {
   return c;
 }
 
+// ---- 廃墟の街：惑星の夜側の灯へズームした先。崩れたビル、瓦礫、錆びた受信アンテナ。灯りは無い ----
+export const DISH_LIGHT = { x: 586, y: 236 };   // 受信アンテナの灯（動く部分は render が描く）
+export function ruinsSprite() {
+  const k = 'ruins';
+  let c = cache.get(k);
+  if (c) return c;
+  const W = CFG.W, H = CFG.H;
+  let seed = 0x3e5;
+  const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296);
+  c = mk(W, H, g => {
+    const sky = g.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, '#070a14'); sky.addColorStop(1, '#161b2c');
+    g.fillStyle = sky; g.fillRect(0, 0, W, H);
+    g.fillStyle = 'rgba(200,210,255,.5)';
+    for (let i = 0; i < 70; i++) g.fillRect(rnd() * W, rnd() * H * 0.55, 1 + rnd(), 1 + rnd());
+    // ビル：上が欠け、傾き、窓が割れている
+    const building = (x, w, h, col, win, tilt) => {
+      const base = H - 70;
+      g.save(); g.translate(x + w / 2, base); g.rotate(tilt);
+      g.beginPath(); g.moveTo(-w / 2, 0); g.lineTo(-w / 2, -h);
+      const steps = 5;
+      for (let i = 1; i <= steps; i++) g.lineTo(-w / 2 + w * i / steps, -h + (rnd() - 0.2) * h * 0.25);   // 崩れた上端
+      g.lineTo(w / 2, 0); g.closePath();
+      g.fillStyle = col; g.fill();
+      g.strokeStyle = 'rgba(90,100,125,.5)'; g.lineWidth = 1; g.stroke();
+      for (let yy = -h + 20; yy < -12; yy += 16)
+        for (let xx = -w / 2 + 6; xx < w / 2 - 8; xx += 12) {
+          const r = rnd();
+          if (r < 0.25) continue;                                      // 窓ごと無い
+          g.fillStyle = r < 0.45 ? '#07090f' : win;                    // 割れて真っ暗な窓
+          g.fillRect(xx, yy, 6, 8);
+        }
+      g.restore();
+    };
+    // 奥の列
+    for (let x = -20; x < W; x += 60 + rnd() * 40) building(x, 50 + rnd() * 40, 120 + rnd() * 140, '#10141f', '#161b28', (rnd() - 0.5) * 0.05);
+    // 手前の列
+    for (let x = -30; x < W; x += 90 + rnd() * 60) {
+      if (x > 470 && x < 640) continue;                                // アンテナのところは空ける
+      building(x, 70 + rnd() * 50, 90 + rnd() * 160, '#1a2031', '#232a3c', (rnd() - 0.5) * 0.12);
+    }
+    // 地面と瓦礫
+    g.fillStyle = '#0c0f17'; g.fillRect(0, H - 70, W, 70);
+    for (let i = 0; i < 40; i++) {
+      const x = rnd() * W, y = H - 70 + rnd() * 50, s = 6 + rnd() * 18;
+      g.fillStyle = rnd() < 0.5 ? '#1e2434' : '#262c3c';
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + s, y - s * 0.4); g.lineTo(x + s * 1.3, y + s * 0.3); g.lineTo(x + s * 0.2, y + s * 0.4); g.closePath(); g.fill();
+    }
+    // 受信アンテナ：錆びた鉄塔の上に、欠けた皿
+    const tx = 560, top = 270, bot = H - 70;
+    g.strokeStyle = '#5a4a3e'; g.lineWidth = 3;
+    g.beginPath(); g.moveTo(tx - 34, bot); g.lineTo(tx - 6, top); g.moveTo(tx + 34, bot); g.lineTo(tx + 6, top); g.stroke();
+    g.lineWidth = 1.5;
+    for (let y = bot; y > top; y -= 26) {
+      const hw = 34 - 28 * ((bot - y) / (bot - top)), hw2 = 34 - 28 * ((bot - y + 26) / (bot - top));
+      g.beginPath(); g.moveTo(tx - hw, y); g.lineTo(tx + hw2, y - 26); g.moveTo(tx + hw, y); g.lineTo(tx - hw2, y - 26); g.stroke();
+    }
+    g.save(); g.translate(tx + 12, top - 16); g.rotate(-0.6);
+    g.fillStyle = '#6d6f78';
+    g.beginPath(); g.ellipse(0, 0, 58, 20, 0, Math.PI, Math.PI * 2 - 0.5); g.lineTo(0, 0); g.closePath(); g.fill();   // 皿（一部が欠けている）
+    g.fillStyle = '#8a5a3c';
+    for (let i = 0; i < 6; i++) { g.beginPath(); g.arc(-40 + rnd() * 70, -10 + rnd() * 8, 2 + rnd() * 3, 0, 7); g.fill(); }   // 錆
+    g.strokeStyle = '#8a8c95'; g.lineWidth = 2.5;
+    g.beginPath(); g.moveTo(0, -2); g.lineTo(18, -26); g.stroke();                                                          // 受信部の腕
+    g.restore();
+    // 垂れ下がったケーブル
+    g.strokeStyle = '#2c2c34'; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(tx + 4, top + 10); g.quadraticCurveTo(tx + 60, top + 120, tx + 30, bot - 10); g.stroke();
+  });
+  cache.set(k, c);
+  return c;
+}
+
 // ---- アイテム ----
 export function itemSprite(kind) {
   const k = 'i|' + kind;
@@ -586,7 +659,7 @@ export function prebuild() {
   for (const k of ['way', 'pow', 'kakera', 'bomb']) itemSprite(k);
   mokoSprite(); byunSprite();
   for (let f = 1; f <= 3; f++) bossSprite(f);
-  midSprite(1); midSprite(2); midSprite(3); guniSprite(); planetSprite();
+  midSprite(1); midSprite(2); midSprite(3); guniSprite(); planetSprite(); ruinsSprite();
   for (const w of ['upper', 'lower']) for (let cr = 0; cr < 4; cr++) coreSprite(w, cr);
   watchFont();
   return cache.size;
