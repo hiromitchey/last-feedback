@@ -279,10 +279,10 @@ function* runPart(si, pi, part, bossForm, cores) {
     // 切り替えは「全滅」かつ「最低時間の経過」
     yield* sched.waitUntil(() => state.frame - state.seg.t0 >= part.min
       && state.enemies.length === 0 && state.warnings.length === 0);
+    // 撃ち漏らしゼロのボーナス。テンポを切らないよう、止まらずにスコアの横へ小さく出すだけ
     if (state.seg.escaped === 0) {
       state.score += CFG.seg.zeroMissBonus;
-      popup('撃ち漏らしゼロ！ +' + CFG.seg.zeroMissBonus, CFG.W / 2, CFG.H / 2, { big: true, size: 36, col: '#FFD54F', life: 90 });
-      yield* sched.wait(90);
+      popup('ALL +' + CFG.seg.zeroMissBonus, 250, 50, { size: 14, col: '#FFD54F', life: 60, vy: -0.3 });
     }
   } else if (part.mid) {
     state.segCap = CFG.boss.cap[0];
