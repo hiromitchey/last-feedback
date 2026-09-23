@@ -90,7 +90,7 @@ export const CFG = {
   scroll: 2.0,
   warpFrames: 90,             // 面の区切りのワープ
   // 母船から惑星への信号の間隔（面ごと）。面が進むほど必死になる
-  signalEvery: [480, 300, 150],
+  signalEvery: [900, 720, 540],   // たまに（15秒 / 12秒 / 9秒）
 
   diff: {
     easy:   { speed: 0.8, count: 0.7, hp: 0.8, orbHp: 0.7, lives: 7, bombs: 4 },  // 既定

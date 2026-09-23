@@ -306,14 +306,11 @@ function drawSignals() {
   }
 }
 
-// 最後の信号：灯の消えた母船から、ゆっくり、はっきり。点線の軌跡と電波の輪を残して惑星へ。届いて、それきり
+// 最後の信号：灯の消えた母船から、ゆっくり、はっきり。電波の輪を広げながら惑星へ。届いて、それきり
 function drawLastSignal(s) {
   const u = Math.min(1, s.t / s.max), e = u * u * (3 - 2 * u);
   const x = s.x0 + (s.tx - s.x0) * e, y = s.y0 + (s.ty - s.y0) * e;
-  // 軌跡（点線）
-  ctx.globalAlpha = s.hit ? Math.max(0, 0.4 - s.hit / 250) : 0.4;
-  ctx.strokeStyle = '#9fe8ff'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 6]);
-  ctx.beginPath(); ctx.moveTo(s.x0, s.y0); ctx.lineTo(x, y); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle = '#9fe8ff'; ctx.lineWidth = 1.5;
   if (!s.hit) {
     // 電波の輪：進みながら何重にも広がる
     for (let i = 0; i < 3; i++) {
