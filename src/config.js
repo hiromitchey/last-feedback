@@ -43,6 +43,8 @@ export const CFG = {
     puni: { hp: 5,  r: 15, size: 48, speed: 2.6, score: 120 },
     moko: { hp: 50, r: 22, size: 80, speed: 2.4, score: 600, stay: 180, stopX: 780 },
     byun: { hp: 12, r: 13, size: 44, speed: 5.6, vy: 1.6, score: 240 },
+    // 子機：母船の「ハイジョセヨ」で出てくる小さな兄弟機
+    chibi: { hp: 2, r: 10, size: 30, speed: 2.8, score: 50, max: 10, count: [4, 5, 6] },
   },
 
   // 道中2区間。切り替えは「全滅」かつ「最低時間の経過」

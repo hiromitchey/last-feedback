@@ -95,6 +95,13 @@ export function moveEnemies() {
         } else e.x += Math.min(3, (e.x - M.stopX) * 0.05 + 0.5);   // 右へ退出
         break;
       }
+      case 'launch':
+        // 子機：母船の口元から扇状に飛び出し、勢いが落ちたらまっすぐ左へ
+        e.x += e.vx; e.y += e.vy;
+        e.vy *= 0.96;
+        e.vx += (-CFG.enemy.chibi.speed - e.vx) * 0.05;
+        if (e.y < 30 || e.y > CFG.H - 30) e.vy = -e.vy;
+        break;
       case 'byun':
         // 高速で左へ。上下の壁で反射。進行方向に回す
         e.x += e.vx; e.y += e.vy;

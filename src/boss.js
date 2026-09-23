@@ -5,6 +5,7 @@ import { state, popup, flash, spawnParticle } from './world.js';
 import * as sched from './sched.js';
 import { needle, fan, bigOrb, laserWarn, hLaser, phrase } from './bullets.js';
 import { spawnItem } from './items.js';
+import { spawnEnemy } from './enemies.js';
 import { fxRng, gameRng } from './rng.js';
 import { BOSS_TEXT as T } from './text.js';
 import { afterBoss } from './story.js';
@@ -77,10 +78,28 @@ function* voiceLoop(b, count, period, col, max) {
     }
     ys.forEach((y, i) => {
       const yc = Math.max(60, Math.min(CFG.H - 60, y));
-      phrase(b, list[idx % list.length], { y: yc, col, ph: gameRng.rnd() * 6, max });
+      const text = list[idx % list.length];
+      phrase(b, text, { y: yc, col, ph: gameRng.rnd() * 6, max });
+      order(b, text);
       idx++;
     });
     yield* sched.wait(period - CFG.warn.shot);
+  }
+}
+
+// 「ハイジョセヨ」と叫んだら、命令に従う小さな兄弟機（子機）が口元から飛び出してくる
+function order(b, text) {
+  if (!/ハイジョ|ﾊｲｼﾞｮ/.test(text)) return;
+  sched.add(minions(b), b.body);
+}
+function* minions(b) {
+  yield* sched.wait(30);
+  const C = CFG.enemy.chibi;
+  const n = Math.min(C.count[b.form - 1], C.max - state.enemies.filter(e => e.type === 'chibi').length);
+  for (let i = 0; i < n; i++) {
+    const a = Math.PI + (i / Math.max(1, n - 1) - 0.5) * 1.6;
+    spawnEnemy('chibi', b.x - 80, b.y, { move: 'launch', vx: Math.cos(a) * 4.5, vy: Math.sin(a) * 4.5 });
+    yield* sched.wait(4);
   }
 }
 
@@ -92,7 +111,9 @@ function* bigLoop(b, period, max) {
   while (true) {
     yield* sched.charge(b);
     const y = Math.max(90, Math.min(CFG.H - 90, state.player.y));
-    phrase(b, list[idx++ % list.length], { y, col: COL.VIOLET, speed: CFG.phrase.bigSpeed, amp: 8,
+    const text = list[idx++ % list.length];
+    order(b, text);
+    phrase(b, text, { y, col: COL.VIOLET, speed: CFG.phrase.bigSpeed, amp: 8,
       sizeMul: CFG.phrase.bigMul, max });
     yield* sched.wait(period - CFG.warn.shot);
   }
@@ -108,7 +129,9 @@ function* fastLoop(b, count, period, max) {
     const base = state.player.y;
     for (let i = 0; i < count; i++) {
       const y = Math.max(40, Math.min(CFG.H - 40, base + (i - (count - 1) / 2) * 110 + gameRng.range(-20, 20)));
-      phrase(b, list[idx++ % list.length], { y, col: COL.PINK, speed: CFG.phrase.fastSpeed, amp: 0,
+      const text = list[idx++ % list.length];
+      if (i === 0) order(b, text);
+      phrase(b, text, { y, col: COL.PINK, speed: CFG.phrase.fastSpeed, amp: 0,
         sizeMul: CFG.phrase.fastMul, max });
       yield* sched.wait(12);
     }
@@ -266,6 +289,7 @@ export function damageBoss(dmg) {
 
 function clearDanger() {
   for (const x of state.eBullets) x.alive = false;
+  for (const e of state.enemies) if (e.type === 'chibi') e.alive = false;
   for (const q of state.phrases) q.alive = false;
   for (const w of state.laserWarns) w.alive = false;
   if (state.boss) state.boss.pendingLaser = null;

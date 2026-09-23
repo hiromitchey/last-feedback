@@ -111,12 +111,13 @@ export function render(debug) {
   }
   ctx.globalAlpha = 1;
   // 敵
-  const spr = { puni: S.puniSprite(), moko: S.mokoSprite(), byun: S.byunSprite() };
+  const spr = { puni: S.puniSprite(), moko: S.mokoSprite(), byun: S.byunSprite(), chibi: S.puniSprite() };
+  const chibiScale = CFG.enemy.chibi.size / CFG.enemy.puni.size;
   for (const e of state.enemies) {
     if (e.hitFlash) ctx.globalAlpha = 0.6;
-    blit(spr[e.type], e.x, e.y, e.type === 'byun' ? e.ang - Math.PI : 0);
+    blit(spr[e.type], e.x, e.y, e.type === 'byun' ? e.ang - Math.PI : 0, e.type === 'chibi' ? chibiScale : 1);
     // 船体番号（047 の前後。047 だけは無い）
-    if (e.num) text(e.num, e.x + 2, e.y + e.r * 0.55, 10, '#fff', 'center', 'rgba(42,33,64,.8)', RETRO_FONT);
+    if (e.num) text(e.num, e.x + 2, e.y + e.r * 0.55, e.type === 'chibi' ? 7 : 10, '#fff', 'center', 'rgba(42,33,64,.8)', RETRO_FONT);
     ctx.globalAlpha = 1;
     // アイテムを持っている個体には目印（倒すと落とす）
     if (e.carry) blit(S.itemSprite(e.carry), e.x + e.r * 0.6, e.y - e.r - 8, 0, 0.62);
