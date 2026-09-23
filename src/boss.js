@@ -145,7 +145,7 @@ function* laserLoop(b, count, period) {
     const c = count === 2 && b.weakenRate >= 1.6 ? 1 : count;   // 45秒続いたら1本に
     yield* laserWarn(b, c);
     // ボムで予告線が消されたら、そのビームは撃たない（予告なしのビームを出さない。原則3）
-    if (!b.pendingLaser) { yield* sched.wait(period - CFG.laser.warn); continue; }
+    if (!b.pendingLaser || !b.pendingLaser.length) { b.pendingLaser = null; yield* sched.wait(period - CFG.laser.warn); continue; }
     const list = T.beam[b.form];
     hLaser(b, list[(b.beamIdx = (b.beamIdx ?? -1) + 1) % list.length]);
     yield* sched.wait(period - CFG.laser.warn);

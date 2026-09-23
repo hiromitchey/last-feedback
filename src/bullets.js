@@ -54,6 +54,26 @@ export function fan(src, n, dir, spread, speed, col) {
 
 // 水平ビーム。必ず laserWarn（予告80f）を経る。2本なら間に80px以上（原則3・5）
 // 予告線のあと、文字の列が横一直線に高速で飛んでくる。1文字ずつ当たり判定がある
+// いま流れている声・ビーム・ビームの予告線が占めている上下の帯
+const LANE_GAP = 6;
+function occupiedBands() {
+  const bands = [];
+  for (const q of state.phrases) if (q.alive) bands.push([q.y0 - q.half, q.y0 + q.half]);
+  const wh = CFG.laser.width / 2 + CFG.phrase.base * CFG.laser.maxTextSize / 2;
+  for (const w of state.laserWarns) if (w.alive) bands.push([w.y - wh, w.y + wh]);
+  return bands;
+}
+// 狙った高さ y に、上下 half の帯が他と重ならずに置けるか。置けなければ一番近い空いている高さ（無ければ null）
+export function freeY(y, half, bands = occupiedBands()) {
+  const lo = half + 8, hi = CFG.H - half - 8;
+  const ok = yy => yy >= lo && yy <= hi && bands.every(([a, b]) => yy + half + LANE_GAP < a || yy - half - LANE_GAP > b);
+  for (let d = 0; d <= CFG.H; d += 8) {
+    if (ok(y + d)) return y + d;
+    if (d && ok(y - d)) return y - d;
+  }
+  return null;
+}
+
 function pickLaserYs(count) {
   const py = state.player.y;
   if (count === 1) return [py];
@@ -67,9 +87,20 @@ function pickLaserYs(count) {
 }
 
 export function* laserWarn(src, count) {
-  const ys = pickLaserYs(count);
+  // ビームも、流れている声と重ならない高さにずらす。置けない分は撃たない
+  const L = CFG.laser;
+  const half = Math.max(L.width / 2, CFG.phrase.base * L.maxTextSize / 2);
+  const bands = occupiedBands(), ys = [];
+  for (const want of pickLaserYs(count)) {
+    const y = freeY(want, half, bands);
+    if (y === null) continue;
+    if (ys.length && Math.abs(y - ys[0]) < L.minGap + L.width) continue;   // 2本なら間を空ける（原則5）
+    ys.push(y);
+    bands.push([y - half, y + half]);
+  }
   src.pendingLaser = ys;
-  const warns = ys.map(y => ({ y, t: CFG.laser.warn, alive: true }));
+  // 予告線はビームが出るまで残す（寿命で先に消えると、その1フレームに別の声が同じ高さへ入り込む）
+  const warns = ys.map(y => ({ y, t: CFG.laser.warn + 5, alive: true }));
   state.laserWarns.push(...warns);
   yield* sched.wait(CFG.laser.warn);
   for (const w of warns) w.alive = false;
@@ -109,11 +140,20 @@ export function phrase(src, text, opt = {}) {
     // 言葉ごとに少し傾ける（強調は大きく）
     c.tilt = c.big ? (c.word % 2 ? 0.14 : -0.12) : (c.word % 2 ? 0.05 : -0.06);
   }
+  // 文字どうしを重ねない：この声が占める上下の帯を決め、空いている高さにずらす（空きが無ければ出さない）
+  const maxPx = Math.max(...chars.map(c => c.px));
+  const amp = opt.amp ?? F.amp;
+  const half = opt.beam ? Math.max(CFG.laser.width / 2, maxPx / 2) : maxPx / 2 + amp + 3;
+  let y0 = opt.y ?? src.y;
+  if (!opt.beam) {
+    y0 = freeY(y0, half);
+    if (y0 === null) return null;
+  }
   const q = {
-    chars, width: x,
-    x: src.x - 80, y0: opt.y ?? src.y,
+    chars, width: x, half,
+    x: src.x - 80, y0,
     v: (opt.speed ?? F.speed) * (opt.beam ? 1 : state.diff.speed),
-    amp: opt.amp ?? F.amp, k: Math.PI * 2 / F.wavelength, ph: opt.ph ?? 0,
+    amp, k: Math.PI * 2 / F.wavelength, ph: opt.ph ?? 0,
     col: opt.col ?? COL.VIOLET, beam: !!opt.beam, t: 0, alive: true,
   };
   layoutPhrase(q);
