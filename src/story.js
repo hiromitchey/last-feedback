@@ -4,6 +4,7 @@ import { CFG } from './config.js';
 import { state } from './world.js';
 import * as sched from './sched.js';
 import { STORY } from './text.js';
+import { BOSS_ARM_ROOT } from './sprites.js';
 import { explode, flash, debris, smoke } from './world.js';
 import { fxRng } from './rng.js';
 
@@ -132,13 +133,17 @@ export function* afterBoss(b) {
   b.burnt = true;
   // 3. おさまる（くすぶる）
   for (let i = 0; i < 5; i++) { smoke(b.x + 20 + fxRng.range(-60, 60), b.y + fxRng.range(-40, 40)); yield* sched.wait(20); }
-  // 4. ボキッ：真ん中にヒビが走る → 間 → 真っ二つに折れて、前後がゆっくり垂れ下がる
-  b.crack = 1;
-  state.shake = 5;
-  yield* sched.wait(45);
-  b.snap = { t: 0 };
-  explode(b.x + 20, b.y, 80); debris(b.x + 20, b.y, 8); flash('#fff', 8); state.shake = 22;
-  yield* sched.wait(80);
+  // 4. ボキッ：羽の付け根にヒビ → 曲がる → もげて回転しながら落ちる。下の羽、一拍おいて上の羽
+  for (const side of ['down', 'up']) {
+    const [rx, ry] = BOSS_ARM_ROOT[side];
+    b.cracks = { ...(b.cracks || {}), [side]: 1 };
+    state.shake = 5;
+    yield* sched.wait(35);
+    b.arms = { ...(b.arms || {}), [side]: { t: 0 } };      // 付け根で曲がり始める（boss.js が動かす）
+    yield* sched.wait(18);
+    explode(b.x + 20 + rx, b.y + ry, 70); debris(b.x + 20 + rx, b.y + ry, 6); flash('#fff', 8); state.shake = 22;
+    yield* sched.wait(side === 'down' ? 50 : 70);
+  }
   while (b.lights > 0) { b.lights--; yield* sched.wait(40); }
   yield* sched.wait(90);                     // 静かになる
   state.logQueue.length = 0;

@@ -205,8 +205,11 @@ export function mokoSprite() {
 // ---- ボス（左向き）：形態ごとに1枚。物語：自己改良の地層 ----
 // 形態1 元の姿に近い・きれい / 形態2 継ぎ接ぎが増える / 形態3 原型をとどめていない
 // 上下 ±90px にコア（コードで描く）が乗るので、上下に腕を出しておく
-export function bossSprite(form) {
-  const k = 'boss|' + form;
+// part：'all' 全体 / 'body' 羽を除いた胴体 / 'up' 上の羽だけ / 'down' 下の羽だけ（撃破で羽がもげて落ちる）
+// どれも同じ大きさ・同じ座標で描くので、重ねれば 'all' と同じになる
+export const BOSS_ARM_ROOT = { up: [5, -35], down: [5, 35] };   // 羽の付け根（絵の中心からのずれ）
+export function bossSprite(form, part = 'all') {
+  const k = 'boss|' + form + '|' + part;
   let c = cache.get(k);
   if (c) return c;
   const W = 260, H = 300, m = { x: W / 2, y: H / 2 };
@@ -223,10 +226,15 @@ export function bossSprite(form) {
       g.quadraticCurveTo(m.x - 20, m.y + sy * 70, m.x - 20, m.y + sy * 25);
       g.closePath();
     };
+    const all = part === 'all', withBody = all || part === 'body';
     for (const sy of [-1, 1]) {
+      if (!all && part !== (sy < 0 ? 'up' : 'down')) continue;
       arm(sy); g.strokeStyle = '#fff'; g.lineWidth = 9; g.stroke();
       g.fillStyle = form === 3 && sy > 0 ? '#8d8398' : body; g.fill();
     }
+    // 羽の上の継ぎ接ぎは羽と一緒に落ちる
+    const onArm = y => (y > 60 ? 'down' : y < -60 ? 'up' : null);
+    const patchHere = y => all || (onArm(y) ? part === onArm(y) : withBody);
     // 本体：左向きの流線形
     const hull = () => {
       g.beginPath();
@@ -238,6 +246,10 @@ export function bossSprite(form) {
       g.quadraticCurveTo(m.x - 90, m.y + 62, m.x - 118, m.y);
       g.closePath();
     };
+    if (!withBody) {
+      if (form >= 2) drawPatches();
+      return;
+    }
     hull(); g.strokeStyle = '#fff'; g.lineWidth = 10; g.stroke();
     g.fillStyle = body; g.fill();
     // 元の意匠：047 と同じ窓と帯（同じ作り手の証）
@@ -250,9 +262,11 @@ export function bossSprite(form) {
     // 後ろのスラスター
     g.fillStyle = dark;
     for (const y of [-34, 0, 34]) { g.fillRect(m.x + 104, m.y + y - 8, 18, 16); }
-    if (form >= 2) {
+    if (form >= 2) drawPatches();
+    function drawPatches() {
       // 継ぎ接ぎ：色の合わない板とボルト
       const patch = (x, y, w, h, col, rot) => {
+        if (!patchHere(y)) return;
         g.save(); g.translate(m.x + x, m.y + y); g.rotate(rot);
         g.fillStyle = col; g.fillRect(-w / 2, -h / 2, w, h);
         g.fillStyle = '#e6e0ff';

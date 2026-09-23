@@ -352,10 +352,15 @@ function startDying(b) {
 // 撃破後は動かない。灯を消していくのは story.js の afterBoss
 function dyingStep(b) {
   b.dying++;
-  if (b.crack && b.crack < 30) b.crack++;          // ヒビが伸びる
-  if (b.snap) {
-    const u = Math.min(1, ++b.snap.t / 90), e = 1 - (1 - u) ** 3;
-    b.snap.ang = e * 0.28; b.snap.sep = e * 26; b.snap.drop = e * 46;
+  // 羽のヒビが伸びる
+  for (const k in b.cracks || {}) if (b.cracks[k] < 30) b.cracks[k]++;
+  // もげた羽：付け根で少し曲がる（ボキッ）→ ちぎれて、回転しながら落ちていく
+  for (const [side, a] of Object.entries(b.arms || {})) {
+    const sy = side === 'up' ? -1 : 1;
+    a.t++;
+    // 下の羽はそのまま落ちる。上の羽はいったん上に弾けてから落ちる
+    if (a.t <= 18) { a.rot = sy * 0.22 * (a.t / 18); a.x = 0; a.y = 0; a.vx = sy > 0 ? -0.6 : 1.2; a.vy = sy > 0 ? 1.2 : -3.2; a.vr = sy * 0.03; }
+    else { a.x += a.vx; a.y += a.vy; a.vy += 0.12; a.rot += a.vr; }
   }
 }
 
