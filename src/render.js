@@ -1,6 +1,6 @@
 // 描画パイプライン（技術設計書 9章）。論理座標は常に 960×540
 import { CFG, COL, DEBUG } from './config.js';
-import { state, particles, planetXY } from './world.js';
+import { state, particles, planetXY, RECEIVER, PLANET_BG_SCALE } from './world.js';
 import { input, touchButtons } from './input.js';
 import * as S from './sprites.js';
 import { fxRng } from './rng.js';
@@ -57,7 +57,7 @@ function drawBackground() {
   // 惑星（ずっと奥に見えている。夜側に灯りがひとつも無い）
   // 面が進むほど大きく見える（近づいている）
   const [px, py] = planetXY(), k = state.planet ?? 1;
-  blit(S.planetSprite(), px, py, 0, 0.75 * k);
+  blit(S.planetSprite(), px, py, 0, PLANET_BG_SCALE * k);
   drawSignals();
   // ワープ中は星が横に伸びて線になる
   const streak = state.warp ? Math.sin(Math.PI * Math.min(1, state.warp.t / CFG.warpFrames)) : 0;
@@ -305,8 +305,10 @@ function drawSignals() {
       ctx.strokeStyle = '#9fe8ff'; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(x, y, 6 + (s.t % 20), 0, 7); ctx.stroke();
     } else {
-      // 届いた：輪が広がって消える。何も返ってこない
+      // 届いた：その点（受信アンテナ）がぽっと光り、輪が広がって消える。何も返ってこない
       const u = s.hit / 50;
+      ctx.globalAlpha = (1 - u) * 0.9; ctx.fillStyle = '#e8fbff';
+      ctx.beginPath(); ctx.arc(s.tx, s.ty, 2 + (1 - u) * 2, 0, 7); ctx.fill();
       ctx.globalAlpha = (1 - u) * (s.weak ? 0.4 : 0.7);
       ctx.strokeStyle = '#9fe8ff'; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(s.tx, s.ty, 8 + u * 40, 0, 7); ctx.stroke();
@@ -330,7 +332,10 @@ function drawLastSignal(s) {
     ctx.globalAlpha = 1;
     ctx.fillStyle = '#e8fbff'; ctx.beginPath(); ctx.arc(x, y, 4, 0, 7); ctx.fill();
   } else {
-    // 届いた：輪が2回広がる。何も返ってこない
+    // 届いた：受信アンテナの灯がぽっと光り、輪が2回広がる。何も返ってこない
+    const g = Math.max(0, 1 - s.hit / 70);
+    ctx.globalAlpha = g; ctx.fillStyle = '#e8fbff';
+    ctx.beginPath(); ctx.arc(s.tx, s.ty, 2 + g * 3, 0, 7); ctx.fill();
     for (const h0 of [0, 40]) {
       const k = (s.hit - h0) / 60;
       if (k < 0 || k > 1) continue;
@@ -652,7 +657,8 @@ function drawStoryText() {
 // ---- 最後の一枚。止まった母船、残骸、灯りのない惑星。一台だけ、まだ動いている ----
 // 惑星の夜側には、灯がひとつだけ点滅している。惑星を触ると、その灯へズームして廃墟の街へ
 export const END_PLANET = { x: 780, y: 160, scale: 1.6 };
-const END_LIGHT = { x: 892, y: 252 };            // 夜側の、ただひとつの灯（いちばん暗いところ）
+// 夜側の、ただひとつの灯＝受信アンテナ（信号が届く点と同じ）
+const END_LIGHT = { x: END_PLANET.x + RECEIVER.dx * END_PLANET.scale, y: END_PLANET.y + RECEIVER.dy * END_PLANET.scale };
 export const ZOOM_FRAMES = 80;
 export function onPlanet(p) {
   const r = S.PLANET_R * END_PLANET.scale, dx = p.x - END_PLANET.x, dy = p.y - END_PLANET.y;

@@ -1,6 +1,6 @@
 // 起動・ループ・状態機械（技術設計書 2章）
 import { CFG, DEBUG } from './config.js';
-import { state, resetWorld, sweep, moveParticles, movePopups, moveBooms, moveSignals, sendSignal, planetXY } from './world.js';
+import { state, resetWorld, sweep, moveParticles, movePopups, moveBooms, moveSignals, sendSignal, receiverXY } from './world.js';
 import { input, initInput, sample, pressed, syncTarget, BTN } from './input.js';
 import * as sched from './sched.js';
 import { movePlayer, shoot, fireBomb } from './player.js';
@@ -61,7 +61,7 @@ function signalTick() {
   if (state.quiet || state.warp) return;
   if (--signalT > 0) return;
   signalT = CFG.signalEvery[state.stage ?? 0];
-  const [tx, ty] = planetXY();
+  const [tx, ty] = receiverXY();
   const b = state.boss;
   if (b && !b.entering && !b.dying) sendSignal(b.x + 20, b.y - 60, tx, ty);
   else sendSignal(CFG.W + 40, 300 + (state.frame % 120), tx, ty);

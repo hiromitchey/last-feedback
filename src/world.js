@@ -140,6 +140,14 @@ export function flash(col, t = 12) { state.flash = { col, t, max: t }; }
 // ---- 信号：母船から惑星へ。電波のように飛び、届いても何も返ってこない（見た目だけ） ----
 // 背景の惑星の位置（描画と同じ）
 export const planetXY = () => [780 - (state.scroll * 0.02) % 40, 120];
+// 受信アンテナの場所：惑星の夜側の1点（惑星の絵の中心からのずれ。絵の大きさ1のとき）
+// 信号はすべてここへ届く。最後の一枚で点滅している灯・ズームの先も同じ点
+export const RECEIVER = { dx: 70, dy: 57.5 };
+export const PLANET_BG_SCALE = 0.75;       // 背景の惑星の大きさ（× 面ごとの state.planet）
+export function receiverXY() {
+  const [px, py] = planetXY(), s = PLANET_BG_SCALE * (state.planet ?? 1);
+  return [px + RECEIVER.dx * s, py + RECEIVER.dy * s];
+}
 
 // kind: 'normal' | 'weak' | 'last'（最後の信号：ゆっくり、はっきり、軌跡を残す）
 export function sendSignal(x, y, tx, ty, kind = 'normal') {

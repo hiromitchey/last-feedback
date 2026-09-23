@@ -5,7 +5,7 @@ import { state } from './world.js';
 import * as sched from './sched.js';
 import { STORY } from './text.js';
 import { BOSS_ARM_ROOT } from './sprites.js';
-import { explode, flash, debris, smoke, sendSignal, planetXY } from './world.js';
+import { explode, flash, debris, smoke, sendSignal, receiverXY } from './world.js';
 import { fxRng } from './rng.js';
 
 const TYPE = 4;       // タイプライター：1文字あたりのフレーム
@@ -159,7 +159,7 @@ export function* afterBoss(b) {
   // 言い終えてから、最後の力で発信する：小さな灯がひとつ点滅して点く → 信号が惑星へ → 届いて、それきり
   b.beacon = { t: 0 };
   yield* sched.wait(60);
-  const [tx, ty] = planetXY();
+  const [tx, ty] = receiverXY();
   const sig = sendSignal(b.x + 20, b.y - 50, tx, ty, 'last');
   yield* sched.waitUntil(() => !sig.alive);
   b.beacon = null;                           // 最後の灯も消える
