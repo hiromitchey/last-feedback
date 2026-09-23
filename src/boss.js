@@ -83,7 +83,8 @@ function* laserLoop(b, count, period) {
   while (true) {
     const c = count === 2 && b.weakenRate >= 1.6 ? 1 : count;   // 45秒続いたら1本に
     yield* laserWarn(b, c);
-    hLaser(b, T.beam[b.form]);
+    const list = T.beam[b.form];
+    hLaser(b, list[(b.beamIdx = (b.beamIdx ?? -1) + 1) % list.length]);
     yield* sched.wait(period - CFG.laser.warn);
   }
 }

@@ -53,7 +53,7 @@ export const CFG = {
   },
 
   // ビーム：予告80fのあと、ボスの声が予告線の高さをまっすぐ速く飛んでくる
-  laser: { warn: 80, fire: 150, width: 44, minGap: 80, textSpeed: 4 },
+  laser: { warn: 80, fire: 150, width: 52, minGap: 80, textSpeed: 4, maxTextSize: 2.2 },
   // ボスの声（言葉のかたまり）。base は標準の文字の大きさ(px)、判定は文字の大きさ×hitRatio
   phrase: { base: 24, speed: 1.9, amp: 42, wavelength: 360, hitRatio: 0.3, max: 3 },
 

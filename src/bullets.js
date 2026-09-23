@@ -81,7 +81,7 @@ export function hLaser(src, text) {
   if (!src.pendingLaser) throw new Error('laserWarn を経ていない');
   const L = CFG.laser;
   for (const y of src.pendingLaser) {
-    const q = phrase(src, (text + '|　|').repeat(4), { y, speed: L.textSpeed, amp: 0, col: COL.YELLOW, beam: true });
+    const q = phrase(src, text, { y, speed: L.textSpeed, amp: 0, col: COL.YELLOW, beam: true, maxSize: L.maxTextSize });
     q.life = 0; q.w = 0; q.srcX = src.x - 80;
   }
   src.pendingLaser = null;
@@ -93,7 +93,9 @@ export function hLaser(src, text) {
 export function phrase(src, text, opt = {}) {
   const F = CFG.phrase;
   if (!opt.beam && state.phrases.filter(q => !q.beam).length >= (opt.max ?? F.max)) return null;
-  const chars = parsePhrase(text);
+  const chars = parsePhrase(text, () => gameRng.rnd());
+  // ビームの文字は帯からはみ出しすぎない大きさまで
+  if (opt.maxSize) for (const c of chars) c.size = Math.min(c.size, opt.maxSize);
   // 横に並べる。文字幅は大きさに比例、言葉の間に少し隙間
   let x = 0, prevWord = 0;
   for (const c of chars) {
