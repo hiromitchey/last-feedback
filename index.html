@@ -17,7 +17,33 @@
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     box-sizing: border-box;
   }
+  #game { position: relative; }
   canvas { display: block; touch-action: none; }
+  #volume-control {
+    position: absolute; top: 48px; right: 10px; z-index: 2;
+    color: #cfd6ff; font: 14px/1.5 "DotGothic16", monospace;
+  }
+  #volume-control summary {
+    display: block; cursor: pointer; list-style: none; text-align: center;
+    min-width: 48px; padding: 4px 7px; border: 1px solid #7191a8;
+    border-radius: 4px; background: rgba(10, 18, 34, .82);
+  }
+  #volume-control summary::-webkit-details-marker { display: none; }
+  #volume-control summary:focus-visible { outline: 2px solid #FFD54F; }
+  #volume-panel {
+    position: absolute; right: 0; top: 36px; width: 180px;
+    padding: 10px 12px; border: 1px solid #7191a8; border-radius: 4px;
+    background: rgba(10, 18, 34, .96); box-sizing: border-box;
+  }
+  #volume-panel label { display: flex; justify-content: space-between; }
+  #volume-panel input { width: 100%; margin: 8px 0 10px; accent-color: #9fe8ff; }
+  #volume-panel input:last-child { margin-bottom: 2px; }
+  #sfx-pick, #sfx-test {
+    width: 100%; padding: 6px; color: #cfd6ff; cursor: pointer;
+    font: inherit; border: 1px solid #7191a8; border-radius: 4px;
+    background: #202f45;
+  }
+  #sfx-pick { margin-bottom: 6px; }
   #rotate {
     display: none; position: fixed; inset: 0; background: #0b0b12; color: #fff;
     font: 22px/1.6 "DotGothic16", monospace;
@@ -27,7 +53,36 @@
 </style>
 </head>
 <body>
-<canvas id="cv"></canvas>
+<div id="game">
+  <canvas id="cv"></canvas>
+  <details id="volume-control">
+    <summary aria-label="音量を調整">音量</summary>
+    <div id="volume-panel">
+      <label for="bgm-volume">BGM <output id="volume-value" for="bgm-volume">65%</output></label>
+      <input id="bgm-volume" type="range" min="0" max="100" step="1" value="65" aria-label="BGMの音量">
+      <label for="sfx-volume">効果音 <output id="sfx-volume-value" for="sfx-volume">65%</output></label>
+      <input id="sfx-volume" type="range" min="0" max="100" step="1" value="65" aria-label="効果音の音量">
+      <select id="sfx-pick" aria-label="試す効果音">
+        <option value="enemy">敵の撃破</option>
+        <option value="level">パワーアップ</option>
+        <option value="type">文字送り</option>
+        <option value="warning">警告</option>
+        <option value="repairBuzz">自己修正中のブザー</option>
+        <option value="snap">母船の羽が折れる</option>
+        <option value="signalFly">廃墟へ降りてくる電波</option>
+        <option value="signal">廃墟に届く電波</option>
+        <option value="bashi">弾ける言葉の1文字（バシッ）</option>
+        <option value="warp">面の切り替え（ワープ）</option>
+        <option value="orb">虹の玉が割れる</option>
+        <option value="kakera">かけらを拾う</option>
+        <option value="hit">命中</option>
+        <option value="heavy">大きい敵の撃破</option>
+        <option value="bigboom">中ボスがはじける</option>
+      </select>
+      <button id="sfx-test" type="button">効果音を試す</button>
+    </div>
+  </details>
+</div>
 <div id="rotate">📱↻<br>横にしてください</div>
 <script type="module" src="./src/main.js"></script>
 </body>

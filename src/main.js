@@ -1,6 +1,6 @@
 // 起動・ループ・状態機械（技術設計書 2章）
 import { CFG, DEBUG } from './config.js';
-import { state, resetWorld, sweep, moveParticles, movePopups, moveBooms, moveSignals, sendSignal, receiverXY } from './world.js';
+import { state, resetWorld, sweep, moveParticles, movePopups, moveBooms, moveSignals, moveTitleMeteor, sendSignal, receiverXY } from './world.js';
 import { input, initInput, sample, pressed, syncTarget, BTN } from './input.js';
 import * as sched from './sched.js';
 import { movePlayer, shoot, fireBomb } from './player.js';
@@ -13,16 +13,47 @@ import { moveEnemies } from './enemies.js';
 import { moveItems } from './items.js';
 import { moveWarnings, startStage } from './formation.js';
 import { collide } from './collide.js';
-import { initRender, render, onPlanet, ZOOM_FRAMES, RUINS_LINE_AT } from './render.js';
-import { prebuild } from './sprites.js';
+import { initRender, render, onPlanet, ZOOM_FRAMES, RUINS_LINE_AT, RUINS_RECEIVE, RUINS_PULSES, RUINS_WAIT } from './render.js';
+import { prebuild, BOSS_WINDOW } from './sprites.js';
 import { dbg, handleKey, tickFps, drawDebug } from './debug.js';
 import { sim } from './autoplay.js';
+import { unlockMusic, syncMusic, getMusicVolume, setMusicVolume } from './music.js';
+import { getSfxVolume, setSfxVolume, unlockSfx, playSfx } from './sfx.js';
 
 const cv = document.getElementById('cv');
 initRender(cv);
 initInput(cv);
+cv.addEventListener('pointerdown', () => { unlockMusic(); unlockSfx(); });
+window.addEventListener('keydown', e => { if (!e.repeat) { unlockMusic(); unlockSfx(); } });
+const volumeControl = document.getElementById('volume-control');
+for (const [inputId, outputId, getVolume, setVolume] of [
+  ['bgm-volume', 'volume-value', getMusicVolume, setMusicVolume],
+  ['sfx-volume', 'sfx-volume-value', getSfxVolume, setSfxVolume],
+]) {
+  const slider = document.getElementById(inputId), value = document.getElementById(outputId);
+  slider.value = Math.round(getVolume() * 100);
+  value.value = slider.value + '%';
+  slider.addEventListener('input', () => {
+    setVolume(Number(slider.value) / 100);
+    value.value = slider.value + '%';
+  });
+}
+// スライダー操作のキーを移動・射撃・開始操作として受け取らない。
+volumeControl.addEventListener('keydown', e => e.stopPropagation());
+document.getElementById('sfx-test').addEventListener('click', async () => {
+  await unlockSfx();
+  playSfx(document.getElementById('sfx-pick').value);   // 聞き比べ用の候補も選べる
+});
 prebuild();
 resetWorld();
+
+function updateMusic() {
+  const inGame = state.mode === 'play' || state.mode === 'pause';
+  const track = inGame && !state.quiet
+    ? (state.seg?.stage === 2 && state.seg.part === 2 ? 'boss' : 'stage')
+    : null;
+  syncMusic(track, state.mode === 'pause');
+}
 
 function startGame() {
   resetWorld();
@@ -58,13 +89,33 @@ function doContinue() {
 // 母船から惑星への信号（見た目だけ）。面が進むほど間隔が短い。ボス戦は母船そのものから
 let signalT = 120;
 function signalTick() {
-  if (state.quiet || state.warp) return;
+  if (state.quiet || state.warp || state.boss?.dying) return;
   if (--signalT > 0) return;
   signalT = CFG.signalEvery[state.stage ?? 0];
   const [tx, ty] = receiverXY();
   const b = state.boss;
-  if (b && !b.entering && !b.dying) sendSignal(b.x + 20, b.y - 60, tx, ty);
+  if (b && !b.entering && !b.dying) sendSignal(b.x + 20 + BOSS_WINDOW.x, b.y + BOSS_WINDOW.y, tx, ty);
   else sendSignal(CFG.W + 40, 300 + (state.frame % 120), tx, ty);
+}
+
+// 最後の一枚でも自機はマウス（キー）についてくる。速さの上限は戦闘中と同じ。範囲は画面全体
+function moveEndPlayer() {
+  const P = CFG.player;
+  const E = state.endPlayer ?? (state.endPlayer = { x: 250, y: 280 });
+  let vx, vy;
+  if (input.mode === 'pointer') {
+    const dx = input.tx - E.x, dy = input.ty - E.y, d = Math.hypot(dx, dy);
+    if (d <= 0.5) return;
+    const s = Math.min(d, P.speed) / d;
+    vx = dx * s; vy = dy * s;
+  } else {
+    const m = Math.max(1, Math.hypot(input.dx, input.dy));
+    vx = input.dx / m * P.speed; vy = input.dy / m * P.speed;
+  }
+  // 戦闘中の移動範囲（右端 xMax まで）には縛らない。惑星のところまで行ける
+  const M = 20;
+  E.x = Math.max(M, Math.min(CFG.W - M, E.x + vx));
+  E.y = Math.max(M, Math.min(CFG.H - M, E.y + vy));
 }
 
 // ワープ中は背景が速く流れる（立ち上がって、ピーク、また戻る）
@@ -138,7 +189,8 @@ function stepPlay() {
   sweep(state.phrases);
   sweep(state.laserWarns);
   sweep(state.colWarns);
-  state.scroll += CFG.scroll * warpSpeed();
+  // 母船の撃破後は背景と受信点を止める。最後の信号から最後の一枚まで同じ位置にする。
+  if (!state.quiet) state.scroll += CFG.scroll * warpSpeed();
 }
 
 function step() {
@@ -154,6 +206,7 @@ function step() {
   switch (state.mode) {
     case 'title':
       if (input.tapped) startGame();
+      else moveTitleMeteor();
       break;
     case 'play':
       if (pressed(BTN.PAUSE)) { state.mode = 'pause'; break; }
@@ -170,22 +223,30 @@ function step() {
       else if (state.contT <= 0) toTitle();
       break;
     case 'ending':
-      // 最後の一枚。説明はしない。惑星を触ると、夜側の灯へズームして廃墟の街へ。ほかを触ればタイトルへ
+      // 最後の一枚。説明はしない。惑星を触ると、夜側の灯へズームして廃墟の街へ。ほかを触っても何もしない
       state.endT++;
       if (state.ruins) {
         // 信号が1つ届く → 「オウトウ・・・セヨ・・・」が流れる → 暗くなって終わり
         const R = state.ruins;
         R.t++;
         // 受信 → アンテナがほわほわ脈打つ余韻 → ゆっくり「オウトウ・・・セヨ・・・」
-        if (R.t === RUINS_LINE_AT) showLine([STORY.finalCall], { y: CFG.H - 40, size: 20, now: true, type: CFG.finalCallType });
+        if (R.t === RUINS_WAIT) playSfx('signalFly');                         // 電波がふよふよ降りてくる間：ほよほよ
+        if (RUINS_PULSES.includes(R.t - RUINS_RECEIVE)) playSfx('signal');   // アンテナが脈打つたびに小さくホワン
+        if (R.t === RUINS_LINE_AT) showLine([STORY.finalCall], { y: CFG.H / 2, size: 30, now: true, type: CFG.finalCallType, hold: CFG.ruinsLineHold });
         if (R.t > RUINS_LINE_AT && !state.logLine && !R.fade) R.fade = 1;
-        if (R.fade && ++R.fade > 150) toTitle();
+        // 暗転しきったら、真っ暗な画面の真ん中に FIN。クリック（決定）でタイトルへ
+        if (R.fade && !R.fin && ++R.fade > CFG.ruinsFade + 30) R.fin = 1;
+        if (R.fin) { if (++R.fin > 60 && input.tapped) toTitle(); }
         else if (R.t > 90 && input.tapped) toTitle();
       } else if (state.zoom) {
         if (++state.zoom.t >= ZOOM_FRAMES) { state.zoom = null; state.ruins = { t: 0 }; }
-      } else if (state.endT > 150 && input.tapped) {
-        if (input.tapAt && onPlanet(input.tapAt)) state.zoom = { t: 0 };
-        else if (state.endT > 240) toTitle();
+      } else {
+        moveEndPlayer();
+        if (state.endT > 150 && input.tapped) {
+          // 惑星を触ると廃墟へ。何もない所を触っても何も起きない（タイトルへは戻らない）
+          // キー・パッドの決定は場所が無いので、そのまま惑星へ（キーだけでも最後まで見られるように）
+          if (!input.tapAt || onPlanet(input.tapAt)) state.zoom = { t: 0 };
+        }
       }
       break;
   }
@@ -201,12 +262,12 @@ function step() {
     if (state.mode === 'play' || state.mode === 'title') signalTick();   // タイトルでも、返事のない呼びかけが飛んでいる
     sweep(state.debris);
     moveStory();
-    if (state.blackout) state.blackout.t++;
     sweep(state.popups);
     if (state.flash && --state.flash.t <= 0) state.flash = null;
     if (state.shake > 0) state.shake = Math.max(0, state.shake - 1);
     if (state.bombFx > 0) state.bombFx--;
   }
+  updateMusic();
 }
 
 // 固定タイムステップ。dt は掛けない。最大4回で追いつきを打ち切る
@@ -242,7 +303,10 @@ requestAnimationFrame(frame);
 
 // タブ復帰の瞬間に被弾するのは理不尽なのでポーズする
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && state.mode === 'play') state.mode = 'pause';
+  if (document.hidden && state.mode === 'play') {
+    state.mode = 'pause';
+    updateMusic();
+  }
 });
 
 // URL の ?scene=名前 で、読み込んだ瞬間にその場面へ（例：?scene=ruins）

@@ -1,7 +1,7 @@
 // 中ボス：壊れてから生まれた歪んだもの。面を追うごとに歪む
 // 倒すと、抱えていた母船の記録（メッセージ）が出る。メッセージが出るのはここだけ
 import { CFG, COL } from './config.js';
-import { state, spawnParticle, explode, flash } from './world.js';
+import { state, spawnParticle, explode, flash, debris } from './world.js';
 import * as sched from './sched.js';
 import { needle, ring, fan, bigOrb, phrase } from './bullets.js';
 import { spawnItem } from './items.js';
@@ -9,6 +9,7 @@ import { fxRng } from './rng.js';
 import { spawnEnemy } from './enemies.js';
 import { showLine, MID_NUMBERS } from './story.js';
 import { STORY, MID_TEXT } from './text.js';
+import { playSfx } from './sfx.js';
 
 // ---- 中ボスごとの攻撃（普通の弾。声は母船だけ） ----
 // 1：少しだけ歪んだ試作品。047 に近い形。攻撃は素直
@@ -128,7 +129,7 @@ function* teleport(m) {
 const KINDS = {
   1: { gen: mid1, frags: ['A0', 'A1'] },
   3: { gen: mid3, frags: ['B1', 'B2', 'B3', 'B4'] },
-  2: { gen: mid2, frags: ['A2', 'A3', 'B0'], parts: [
+  2: { gen: mid2, frags: ['A2', 'A3', 'B0', 'B5'], parts: [
     { dx: -46, dy: -62, gen: partUpper }, { dx: -46, dy: 62, gen: partLower },
   ] },
 };
@@ -144,6 +145,7 @@ export function* midbossFight(kind) {
   const M = CFG.midboss;
   const K = KINDS[kind];
   state.bossWarn = 70;
+  playSfx('warning');
   yield* sched.wait(70);
   const hp = M.hp[kind - 1] * state.diff.hp;
   const m = {
@@ -162,7 +164,7 @@ export function* midbossFight(kind) {
   sched.add(K.gen(m), m.atk);
   for (const p of m.parts) startPart(p);
   yield* sched.waitUntil(() => m.dying > 0);
-  // 静かに崩れる → 一瞬スロー → 記録が1行ずつ → 読み終わってから再開
+  // 連鎖爆発で崩れる → 一瞬スロー → 記録が1行ずつ → 読み終わってから再開
   for (const b of state.eBullets) b.alive = false;
   state.slowT = 60;
   yield* sched.wait(50);
@@ -209,8 +211,17 @@ export function moveMid() {
   if (m.hitFlash) m.hitFlash--;
   if (m.dying) {
     m.dying++;
-    if (m.dying % 7 === 0 && m.dying < 42) explode(m.x + fxRng.range(-50, 50), m.y + fxRng.range(-50, 50), 30 + fxRng.rnd() * 30);
-    if (m.dying === 45) { explode(m.x, m.y, 110); flash('#fff', 16); }
+    // 連鎖爆発 → 途中で一度大きく → 最後に本体がはじける。音も爆発ごとに鳴らす
+    if (m.dying % 4 === 0 && m.dying < 40) {
+      explode(m.x + fxRng.range(-60, 60), m.y + fxRng.range(-55, 55), 30 + fxRng.rnd() * 40);
+      playSfx('pop');
+    }
+    if (m.dying === 24) { explode(m.x + fxRng.range(-20, 20), m.y + fxRng.range(-20, 20), 80); debris(m.x, m.y, 4); flash('#fff', 6); }
+    if (m.dying === 44) {
+      explode(m.x, m.y, 140); explode(m.x - 40, m.y + 25, 70); explode(m.x + 35, m.y - 30, 70);
+      debris(m.x, m.y, 10); flash('#fff', 20); state.shake = Math.max(state.shake, 24);
+      playSfx('bigboom');
+    }
     return;
   }
   if (m.glitch > 0) m.glitch--;
@@ -224,10 +235,12 @@ export function moveMid() {
 
 export function damageMidPart(p, dmg) {
   if (p.dead) return;
+  playSfx('hit');
   p.hp -= dmg; p.hitFlash = 3;
   state.score += CFG.score.hit;
   if (p.hp <= 0) {
     p.dead = true;
+    playSfx('heavy');
     if (p.atk) p.atk.alive = false;
     p.repairT = CFG.midboss.repairWait;
     state.score += CFG.midboss.partScore;
@@ -239,10 +252,12 @@ export const midTargetable = () => state.mid && !state.mid.entering && !state.mi
 
 export function damageMid(dmg) {
   const m = state.mid;
+  playSfx('hit');
   m.hp -= dmg; m.hitFlash = 3;
   state.score += CFG.score.hit;
   if (m.hp <= 0) {
     m.hp = 0; m.dying = 1; m.glow = 0;
+    playSfx('boom');
     if (m.atk) m.atk.alive = false;
     for (const p of m.parts) { if (p.atk) p.atk.alive = false; p.dead = true; p.fly = null; p.repairT = 0; }
     m.ghost = null;

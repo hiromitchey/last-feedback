@@ -6,6 +6,7 @@ import { needle, ring, bigOrb } from './bullets.js';
 import { spawnItem } from './items.js';
 import { gameRng, fxRng } from './rng.js';
 import { nextHullNumber, nextBrokenNumber } from './story.js';
+import { playSfx } from './sfx.js';
 
 // opt:
 //   move  : 'straight' | 'wave' | 'converge' | 'uturn' | 'moko' | 'byun'
@@ -21,7 +22,7 @@ export function spawnEnemy(type, x, y, opt = {}) {
     alive: true, hitFlash: 0, glow: 0, ang: Math.PI,
     move: opt.move ?? (type === 'puni' ? 'straight' : type),
     amp: opt.amp ?? 0, freq: opt.freq ?? 0.04, phase: opt.phase ?? 0,
-    ty: opt.ty ?? 270, dy: opt.dy ?? 0, phaseN: 0,
+    ty: opt.ty ?? 270, tx: opt.tx ?? x, dy: opt.dy ?? 0, phaseN: 0,
     carry: opt.carry ?? null,
     // 正常な個体（ぷに・びゅん）には船体番号。壊れてから作られた もこ には無い
     // 兄弟（ぷに・びゅん・子機）は正しい番号、壊れかけ（もこ・ゆがみ）は化けた番号
@@ -109,6 +110,13 @@ export function moveEnemies() {
         w.rot = Math.sin(e.t * 0.09 + w.p) * 0.4;
         break;
       }
+      case 'line': {
+        // 子機の縦一列：口元から持ち場（縦に並んだ位置）へ寄って、そろったら一列のまま左へ
+        const L = CFG.enemy.chibi;
+        if (e.t < L.lineForm) { e.x += (e.tx - e.x) * 0.1; e.y += (e.ty - e.y) * 0.1; }
+        else e.x -= L.lineSpeed;
+        break;
+      }
       case 'launch':
         // 子機：母船の口元から扇状に飛び出し、勢いが落ちたらまっすぐ左へ
         e.x += e.vx; e.y += e.vy;
@@ -147,6 +155,7 @@ function killEnemy(e) {
   const E = CFG.enemy[e.type];
   state.score += E.score;
   const big = e.type === 'moko';
+  playSfx(big ? 'heavy' : 'enemy');
   const cols = ['#fff', '#FF9E3D', '#FFD54F', '#FF5C8A'];
   for (let i = 0; i < (big ? 40 : 18); i++) {
     const a = fxRng.rnd() * Math.PI * 2, s = 1.5 + fxRng.rnd() * (big ? 6 : 4);

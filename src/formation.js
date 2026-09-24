@@ -8,6 +8,7 @@ import { gameRng } from './rng.js';
 import { bossFight, skipForm } from './boss.js';
 import { mission } from './story.js';
 import { midbossFight, midTargetable, damageMid } from './midboss.js';
+import { playSfx } from './sfx.js';
 
 function warn(ys) {
   for (const y of ys) state.warnings.push({ y, t: CFG.warn.spawn, alive: true });
@@ -270,9 +271,16 @@ export const STAGES = [
 ];
 
 // 面の区切り：星が線になって流れるワープ（約1.5秒）。中ボスを倒して記録を読んだあと
-function* warp() {
+// 惑星はワープのあいだに次の面の大きさへなめらかに近づく（面の頭で一気に大きくならないように）
+function* warp(nextPlanet) {
   state.warp = { t: 0 };
-  yield* sched.wait(CFG.warpFrames);
+  playSfx('warp');
+  const from = state.planet, to = nextPlanet ?? from;
+  for (let i = 1; i <= CFG.warpFrames; i++) {
+    const u = i / CFG.warpFrames;
+    state.planet = from + (to - from) * (0.5 - 0.5 * Math.cos(Math.PI * u));
+    yield;
+  }
   state.warp = null;
 }
 
@@ -295,7 +303,7 @@ function* runPart(si, pi, part, bossForm, cores) {
   } else if (part.mid) {
     state.segCap = CFG.boss.cap[0];
     yield* midbossFight(part.mid);
-    yield* warp();
+    yield* warp(STAGES[si + 1]?.planet);
   } else if (part.boss) {
     state.checkpoint.boss = true;
     yield* bossFight(bossForm, cores);

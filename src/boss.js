@@ -3,12 +3,13 @@
 import { CFG, COL } from './config.js';
 import { state, popup, flash, spawnParticle } from './world.js';
 import * as sched from './sched.js';
-import { needle, fan, bigOrb, laserWarn, hLaser, phrase, slam, column } from './bullets.js';
+import { needle, fan, bigOrb, laserWarn, hLaser, phrase, slam, column, ray, burst, wordFan, wordStream, bigDrop } from './bullets.js';
 import { spawnItem } from './items.js';
 import { spawnEnemy } from './enemies.js';
 import { fxRng, gameRng } from './rng.js';
 import { BOSS_TEXT as T } from './text.js';
 import { afterBoss } from './story.js';
+import { playSfx } from './sfx.js';
 
 const B = () => CFG.boss;
 
@@ -39,24 +40,25 @@ function syncParts(b) {
 function* repairing() { yield* sched.waitUntil(() => !state.boss || state.boss.trans === 0); }
 
 // ---- 部位の攻撃 ----
+// 小さい弾は使わず、言葉を1文字ずつ撃つ（ユーザー要望：文字で攻撃）
+const coreWord = (k, i) => { const l = T.core[k][state.boss?.form ?? 1]; return l[i % l.length]; };
 function* upperCore(p) {
-  // はり弾 狙い×2（ピンク）／120f
+  // 狙った線に言葉を1文字ずつ（ピンク＝速い）／約120f
   yield* sched.wait(40);
-  while (true) {
+  for (let i = 0; ; i++) {
     yield* repairing();
     yield* sched.charge(p);
-    needle(p, 2.8, COL.PINK, -0.1);
-    needle(p, 2.8, COL.PINK, 0.1);
-    yield* sched.wait(90);
+    yield* wordStream(p, coreWord('upper', i), 2.8, COL.PINK);
+    yield* sched.wait(70);
   }
 }
 function* lowerCore(p) {
-  // 4way扇（シアン）／120f、上と60fずらす
+  // 言葉を扇に広げて1文字ずつ（シアン）／約120f、上とずらす
   yield* sched.wait(100);
-  while (true) {
+  for (let i = 0; ; i++) {
     yield* repairing();
     yield* sched.charge(p);
-    fan(p, 4, 'aim', 1.2, 2.0, COL.CYAN);
+    wordFan(p, coreWord('lower', i), 'aim', 1.2, 2.0, COL.CYAN);
     yield* sched.wait(90);
   }
 }
@@ -64,27 +66,40 @@ function* lowerCore(p) {
 // ---- 本体の攻撃（形態ごと） ----
 // 声は「進行役」が1つずつ順番に出す（横に流すだけだと動画のコメントに見えるので、見せ方を混ぜる）
 //   slam 叩きつけ → 崩れて弾 / fallN 縦書きがN本降る / riseN 下から上がる / flow 波打って流れる / fast 速い小さい文字
+//   rayN 母船の口から言葉がN本、扇状に出て放射状に広がる / chantN 同じ言葉（コワセ・マモル）をN本の扇で
+//   burst 母船の前に弧を描いて1行並び、1文字ずつくるくる回って大きくなりながら飛び散る
+//   drop でっかい言葉が上から、少し遅れて下から、速く来る（左右によける）。形態1 イジョウ／ハイジョ、形態3 ダメ！／ダメ！！
+// 新しい見せ方（扇・弾ける言葉）は各形態の最初のほうに置く（形態が短く終わっても必ず見える）
+// 縦書き（fall/rise）より放射（扇・コワセ/マモルの扇・弾ける言葉）を多く（ユーザー要望）。縦書きは形態3に1回だけ
 const VOICE_SEQ = {
-  1: ['slam', 'flow', 'slam', 'fall1'],
-  2: ['slam', 'fall1', 'fast', 'slam', 'rise1', 'flow'],
-  3: ['slam', 'fall2', 'fast', 'slam', 'rise2', 'flow', 'slam', 'fall3'],
+  1: ['burst', 'slam', 'drop', 'ray5', 'flow', 'chant5', 'slam', 'ray5', 'drop'],
+  2: ['ray5', 'slam', 'chant5', 'burst', 'ray5', 'fast', 'slam', 'chant5', 'flow'],
+  3: ['burst', 'chant7', 'drop', 'ray7', 'slam', 'burst', 'fast', 'drop', 'ray7', 'slam', 'chant7', 'flow', 'fall2'],
 };
-const nonBeam = () => state.phrases.filter(q => !q.beam);
-const colsBusy = () => state.colWarns.length > 0 || state.phrases.some(q => q.kind === 'col');
+// 扇・弾ける言葉は、母船のまわりを離れて広がったら「済んだ」扱いにして次へ進む（画面を出るまで待つと、次の声が10秒以上出ない）
+const spreading = q => (q.kind === 'ray' && q.head >= CFG.ray.busyDist) || (q.kind === 'burst' && q.t >= q.hold + CFG.burst.busyAfter);
+const nonBeam = () => state.phrases.filter(q => !q.beam && !spreading(q));
+const colsBusy = () => state.colWarns.length > 0
+  || state.phrases.some(q => (q.kind === 'col' || q.kind === 'ray' || q.kind === 'burst' || q.kind === 'drop') && !spreading(q));
 const beamBusy = () => state.laserWarns.length > 0 || state.phrases.some(q => q.beam);
 
 function* voiceDirector(b) {
   yield* sched.wait(60);
   const seq = VOICE_SEQ[b.form];
-  const idx = { slam: 0, col: 0, flow: 0, fast: 0 };
+  const idx = { slam: 0, col: 0, flow: 0, fast: 0, ray: 0, burst: 0, chant: 0 };
   const pick = (list, k) => list[idx[k]++ % list.length];
   for (let i = 0; ; i++) {
     const p = seq[i % seq.length];
-    const vertical = p.startsWith('fall') || p.startsWith('rise');
+    const vertical = p.startsWith('fall') || p.startsWith('rise') || p.startsWith('ray') || p.startsWith('chant') || p === 'burst' || p === 'drop';   // 画面を縦に使う攻撃
     // 縦の言葉と横の言葉は同時に出さない（重ねない）
     if (vertical) {
-      yield* sched.waitUntil(() => nonBeam().length === 0 && !beamBusy() && !colsBusy());
-      b.vertPending = true;                 // 縦書きを出すと決めた。ビームはこれが消えるまで待つ
+      // 先に「縦を出す」と宣言して、次のビームを止めてから、いまのビームが終わるのを待つ
+      // （宣言が後だと、ビームが途切れなく続く形態2では縦の攻撃がいつまでも出られない）
+      b.vertPending = true;
+      // 扇・弾ける言葉は母船の口から出るので、横に流れる声が母船の前（画面の右半分）を過ぎていれば出してよい
+      const fromShip = p.startsWith('ray') || p.startsWith('chant') || p === 'burst';
+      const inWay = q => !fromShip || q.kind === 'slam' || q.x === undefined || q.x + q.width > CFG.W / 2;
+      yield* sched.waitUntil(() => !nonBeam().some(inWay) && !beamBusy() && !colsBusy());
     } else yield* sched.waitUntil(() => !colsBusy() && nonBeam().length <= 1);
     yield* sched.charge(b);
     if (p === 'slam') {
@@ -93,6 +108,35 @@ function* voiceDirector(b) {
       slam(b, text, { x: 470, y, col: COL.VIOLET });
       order(b, text);
       yield* sched.wait(CFG.slam.stamp + CFG.slam.hold + 40);
+    } else if (p === 'burst') {
+      const text = pick(T.burst[b.form], 'burst');
+      const q = burst(b, text);
+      order(b, text);
+      yield* sched.wait((q ? q.hold : 0) + 40);          // 読ませて点滅して飛び散るまで、次の声は待つ
+      b.vertPending = false;
+    } else if (p === 'drop') {
+      // 上から自機の真上に、少し遅れて下から横にずらして。2つの間を抜ける
+      const px = state.player.x, other = px < CFG.W / 2 - 60 ? px + 300 : px - 300;
+      const [a, c] = T.drop[b.form];
+      sched.add(bigDrop(b, a, { x: px, dir: 1 }), b.body);
+      yield* sched.wait(30);
+      sched.add(bigDrop(b, c, { x: other, dir: -1 }), b.body);
+      yield* sched.wait(CFG.drop.warn + 40);
+      b.vertPending = false;
+    } else if (p.startsWith('chant')) {
+      const n = +p.slice(5);
+      const [center, rest] = pick(T.chant[b.form], 'chant').split('|');
+      const words = Array(n).fill(rest ?? center);
+      if (rest) words[n >> 1] = center;              // 真ん中の線だけ別の言葉（ホシヲ ／ まわりは マモル）
+      ray(b, words);
+      order(b, words.join(''));                      // コワセ → 子機が縦一列で来る
+      yield* sched.wait(80);
+      b.vertPending = false;
+    } else if (p.startsWith('ray')) {
+      const n = +p.slice(3), list = T.ray[b.form];
+      ray(b, Array.from({ length: n }, () => pick(list, 'ray')));
+      yield* sched.wait(80);
+      b.vertPending = false;
     } else if (vertical) {
       const n = +p.slice(4), dir = p.startsWith('fall') ? 1 : -1;
       const px = Math.max(100, Math.min(620, state.player.x));
@@ -122,9 +166,25 @@ function* voiceDirector(b) {
 }
 
 // 「ハイジョセヨ」と叫んだら、命令に従う小さな兄弟機（子機）が口元から飛び出してくる
+// 「コワセ」のときは、子機が縦一列に並んで壁のように来る
 function order(b, text) {
+  if (/コワセ|ｺﾜｾ/.test(text)) { sched.add(minionLine(b), b.body); return; }
   if (!/ハイジョ|ﾊｲｼﾞｮ/.test(text)) return;
   sched.add(minions(b), b.body);
+}
+function* minionLine(b) {
+  yield* sched.wait(20);
+  const C = CFG.enemy.chibi;
+  const room = C.max - state.enemies.filter(e => e.type === 'chibi').length;
+  const n = Math.min(C.lineN, room);
+  if (n < 3) return;
+  // 縦に並ぶ高さ。自機にいちばん近い1か所だけ空けて、抜けられるようにする
+  const top = CFG.H / 2 - (C.lineN - 1) * C.lineGap / 2;
+  const ys = Array.from({ length: C.lineN }, (_, i) => top + i * C.lineGap);
+  let gap = 0;
+  ys.forEach((y, i) => { if (Math.abs(y - state.player.y) < Math.abs(ys[gap] - state.player.y)) gap = i; });
+  const slots = ys.filter((_, i) => i !== gap).slice(0, n);
+  for (const y of slots) spawnEnemy('chibi', b.x - 80, b.y, { move: 'line', tx: C.lineX, ty: y });
 }
 function* minions(b) {
   yield* sched.wait(30);
@@ -161,10 +221,12 @@ function* orbLoop(b, count, period) {
   }
 }
 function* needleLoop(b, period) {
+  // 形態3：本体からも狙った言葉を1文字ずつ（ピンク）
   yield* sched.wait(30);
-  while (true) {
+  for (let i = 0; ; i++) {
     yield* sched.charge(b, 20);
-    needle(b, 3.2, COL.PINK);
+    const l = T.core.body;
+    yield* wordStream({ x: b.x - 80, y: b.y }, l[i % l.length], 3.2, COL.PINK);
     yield* sched.wait(period - 20);
   }
 }
@@ -177,7 +239,10 @@ function startForm(b) {
   // 声は進行役が1つずつ（叩きつけ・降る・上がる・流れる）
   sched.add(voiceDirector(b), o);
   if (b.form === 2) {
-    sched.add(laserLoop(b, 1, 240), o);
+    // ビームの間は縦の言葉が出られず、かえって楽になっていた（画面の脅威が形態1より少ない）。
+    // ビームを少し間引き、本体からも言葉を1文字ずつ撃つ
+    sched.add(laserLoop(b, 1, 320), o);
+    sched.add(needleLoop(b, 100), o);
     sched.add(orbLoop(b, 2, 300), o);
   }
   if (b.form === 3) {
@@ -197,6 +262,7 @@ export function* bossFight(form = 1, cores = null) {
   state.segCap = B().cap[form - 1];
   // 警告 → 右から大きくスライドイン
   state.bossWarn = 100;
+  playSfx('warning');
   yield* sched.wait(100);
   const b = makeBoss(form, cores);
   state.boss = b;
@@ -258,10 +324,12 @@ export const bossTargetable = () => state.boss && !state.boss.entering && !state
 
 export function damagePart(p, dmg) {
   if (p.dead) return;
+  playSfx('hit');
   p.hp -= dmg; p.hitFlash = 3;
   state.score += CFG.score.hit;
   if (p.hp <= 0) {
     p.dead = true;
+    playSfx('heavy');
     state.score += B().coreScore;
     boom(p.x, p.y, 50, 8);
     state.shake = 16;
@@ -271,6 +339,7 @@ export function damagePart(p, dmg) {
 
 export function damageBoss(dmg) {
   const b = state.boss;
+  playSfx('hit');
   b.hp -= dmg; b.hitFlash = 3;
   state.score += CFG.score.hit;
   if (b.form < 3 && b.hp <= b.th[b.form - 1]) nextForm(b);
@@ -296,6 +365,8 @@ const REPAIR_PIECES = {
 const REPAIR_LEN = 190;
 
 function nextForm(b) {
+  playSfx('repair');
+  playSfx('repairBuzz');                  // 直している間、低いブザーが鳴り続ける
   b.hp = b.th[b.form - 1];
   b.drawForm = b.form;                    // 板が留まり終わるまでは前の姿
   b.form++;
@@ -325,6 +396,7 @@ function nextForm(b) {
 
 // 倒しても派手にしない。攻撃が止まり、動きが止まる（物語）
 function startDying(b) {
+  playSfx('boom');
   b.hp = 0;
   b.dying = 1;
   b.weakenRate = 1;
@@ -333,6 +405,8 @@ function startDying(b) {
   if (b.body) b.body.alive = false;
   for (const p of b.parts) p.dead = true;
   clearDanger();
+  // 爆発中に、撃破直前の通信が窓のそばに残らないようにする
+  for (const s of state.signals) s.alive = false;
   const sec = (state.frame - state.bossT0) / 60;
   const T = B().timeBonus;
   const tb = Math.max(0, T.full - Math.max(0, Math.floor(sec - T.within)) * T.perSec);
@@ -343,7 +417,7 @@ function startDying(b) {
 // ぶら下がる羽：ガクッと傾いて少し跳ね返り、そのあとゆらゆら揺れ続ける（落ちそうで落ちない）
 export const HANG_ROT = 0.6;   // 外側（左）へ折れ曲がる
 export function hangRot(t) {
-  if (t < 18) return HANG_ROT * 0.3 * (t / 18);                       // ヒビで少し曲がる
+  if (t < 18) return HANG_ROT * 0.3 * (t / 18);                       // 付け根の小爆発のあと少し曲がる
   const u = t - 18;
   if (u < 40) return HANG_ROT * (1 - Math.exp(-u / 6) * Math.cos(u / 3)); // ガクッ → 跳ね返り
   return HANG_ROT + Math.sin(u * 0.05) * 0.05;                         // ゆらゆら
@@ -352,11 +426,13 @@ export function hangRot(t) {
 // 撃破後は動かない。灯を消していくのは story.js の afterBoss
 function dyingStep(b) {
   b.dying++;
-  if (b.beacon) b.beacon.t++;
+  if (b.finalDim != null) b.finalDim = Math.min(CFG.boss.finalDim, b.finalDim + 1);
+  if (b.beacon) {
+    b.beacon.t++;
+    if (b.beacon.fadeT != null) b.beacon.fadeT++;
+  }
   // 焼け残りがゆっくり左下へ漂う（惑星から離れ、最後の信号の道のりが見えるように）
   if (b.drift) { b.x += (650 - b.x) * 0.008; b.y += (CFG.H / 2 + 110 - b.y) * 0.008; }
-  // 羽のヒビが伸びる
-  for (const k in b.cracks || {}) if (b.cracks[k] < 30) b.cracks[k]++;
   // もげた羽：付け根で少し曲がる（ボキッ）→ ちぎれて、回転しながら落ちていく
   for (const [side, a] of Object.entries(b.arms || {})) {
     const sy = side === 'up' ? -1 : 1;
@@ -391,4 +467,3 @@ export function bombBoss(dmg) {
   for (const p of state.boss.parts) damagePart(p, dmg);
   damageBoss(dmg);
 }
-

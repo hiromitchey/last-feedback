@@ -1,0 +1,35 @@
+{
+  "name": "1面",
+  "channels": {
+    "p1": "; 1面（道中）— イントロ(1-4) → A(5-12) → * B(13-20) → ビルド(21-24) → A'(25-32) → B に戻る\n; * はループ位置（全チャンネル同じ小節に置く）\n$lead = @d{2 2 1 0} @v{15 14 13 12 11 11 10} @r2 @m20,22,9\nT176 $lead V12 L8 q7\nr1 r1 r1 r1\n\nO5 c e g >c4< g e g\nO5 b4 >d< b g4 a b\nO5 >c4 e d c4< a4\nO5 a g f g a4 >c4<\nO5 >e4. d c4< g4\nO5 b >c d4 c< b g4\nO5 a b >c d e4 f4<\nO5 >g4 f e d2<\n*\n; B（案1：勢いそのまま）— 伸ばす音で2小節ずつ登り、後半は分散和音で駆け上がる\n$lead V12 L8 q7\nO5 a4. g a4 >c4<\nO5 b4. a g a b4 \nO5 g4. f+ g4 b4\nO5 >c2< b4 a4\nO5 f a >d f e4 d4<\nO5 g b >e g e4 d4<\nO5 a >c f a g4 f4<\nO6 g2 d4 <b4\n$lead V12 q8\n\nO5 f2 a2\nO5 g2 b2\nO5 a2 >c2<\nO5 b4 >d4 f4 g4<\nq7\n\nO5 c e g >c4< g e g\nO5 b4 >d< b g4 a b\nO5 >c4 e d c4< a b\nO5 a g f g a4 >c d<\nO5 >e4. d c d e4<\nO5 >d4. c< b >c d4<\nO5 a b >c d e4 f4<\nO5 >g4 f e d16e16f16g16 d4<",
+    "p2": "; ディレイ — ビルドから入る\n[r1]12\n*\n; B〜ビルド〜A'：p1 を16分遅らせて参照（ディレイ。メロディを直すと自動でついてくる）\n$lead V5 L8 q7\n{p1 13-32 >16}",
+    "tri": "; ベース — イントロ後半から4分で入る → Aで8分のオクターブ → ビルドの最後は16分で煽る\nr1 r1 L4 q4 O2 a a a a f f g g\nL8 q5\n[c>c<]4 [g>g<]4 [a>a<]4 [f>f<]4 [c>c<]4 [g>g<]4 [f>f<]4 [g>g<]4\n*\n; B（案1）— A と同じオクターブの8分。D→E→F→G と登る\n[f>f<]4 [g>g<]4 [e>e<]4 [a>a<]4 [d>d<]4 [e>e<]4 [f>f<]4 [g>g<]4\n[f>f<]4 [g>g<]4 [a>a<]4 L16 [g>g<]8 L8\n[c>c<]4 [g>g<]4 [a>a<]4 [f>f<]4 [c>c<]4 [g>g<]4 [f>f<]4 [g>g<]4",
+    "noi": "; ドラム — V（音量）と刻みを段階的に上げる\n; イントロ：ハイハット → キック追加 ／ A：8ビート ／ ビルド：4つ打ち → スネア連打 ／ A'：2ビート（スネアが裏）\n$k = @v{15 13 10 7 4 2 0} n10\n$s = @v{15 14 12 10 8 6 5 4 3 2 1 0} n5\n$h = @v{8 4 2 0} n1\n$o = @v{8 7 6 5 4 3 2 1 0} n0\n$c = @v{15 15 14 13 12 11 10 9 8 7 6 5 5 4 4 3 3 2 2 1 1 0} n3\nL16 q8\nV7 [ $h r ]16\nV9 [ $k r $h r ]6 $k r $h r $s $s $s $s\nV12 $c $h $h $h $s $h $h $h $k $h $k $h $s $h $o r\n[ $k $h $h $h $s $h $h $h $k $h $k $h $s $h $o r ]6\n$k $h $k $h $s $h $k $h $s $s $s $s $s $s $o r\n*\n; B（案1）— 8ビートのまま、ハイハットを開き気味に。最後はフィル\nV13 $c $h $o $h $s $h $o $h $k $h $o $h $s $h $o $h\n[ $k $h $o $h $s $h $o $h $k $h $o $h $s $h $o $h ]6\n$k $h $k $h $s $h $k $h $s $s $s $s $s $s $o r\nV13 [ $k $h $h $h ]8\n[ $s r ]8\nV6 $s $s $s $s V9 $s $s $s $s V12 $s $s $s $s V15 $s $s $s $s\n$c $h $s $h [ $k $h $s $h ]3\n[ [ $k $h $s $h ]4 ]6\n$k $h $s $h $k $h $s $h $s $s $s $s $s $s $o r",
+    "e1": "; アルペジオ — イントロの主役。小さく始めて少しずつ大きく。ビルドの最後で1オクターブ上がる\n@1 @v{15 10 7 5} q8 L32 O4\nV2 [cege]8 V3 [gb>d<b]8 V4 [a>cec<]8 V5 [fa>c<a]8\nV5 [cege]8 [gb>d<b]8 [a>cec<]8 [fa>c<a]8 [cege]8 [gb>d<b]8 [fa>c<a]8 [gb>d<b]8\n*\n; B（案1）— A と同じ32分のアルペジオ\nV5 [fa>c<a]8 [gb>d<b]8 [egbg]8 [a>cec<]8 [dfaf]8 [egbg]8 [fa>c<a]8 [gb>d<b]8\nV6 [fa>c<a]8 [gb>d<b]8 [a>cec<]8 > [gb>d<b]8 <\nV6 [cege]8 [gb>d<b]8 [a>cec<]8 [fa>c<a]8 [cege]8 [gb>d<b]8 [fa>c<a]8 [gb>d<b]8",
+    "e2": "; 持続音 — ビルドから入って、ずっと上がっていく\n[r1]12\n*\n; B（案1）— 小さく持続音\n@5 @v{4 6 8 10 11 12 12 12 11 11 10} V3 @r3 @m30,12,12 L1 q7 O4\na b g a f g a b\n@5 @v{4 6 8 10 11 12 12 12 11 11 10} V4 @r3 @m30,12,12 L1 q7 O4\nf g a b\ng g e f  g g a b",
+    "saw": "; のこぎり — Aは4分で控えめ → ビルドで8分、最後は16分 → A'でオクターブを跳ねて全開\n@v{15 14 12 10 9 8 7 6} @r1 O3\nr1 r1 r1 r1\nV16 L4 q4 [c]4 [g]4 [a]4 [f]4 [c]4 [g]4 [f]4 [g]4\n*\n; B（案1）— 付点のリズムで押す\nV18 L8 q5\nf4. f r4 f4 | g4. g r4 g4 | e4. e r4 e4 | a4. a r4 a4\nd4. d r4 d4 | e4. e r4 e4 | f4. f r4 f4 | g4. g r4 g4\nV22 L8 q6 [f]8 [g]8 [a]8 L16 [g]16 L8\nV28 [c c >c< c]2 [g g >g< g]2 [a a >a< a]2 [f f >f< f]2 [c c >c< c]2 [g g >g< g]2 [f f >f< f]2 [g g >g< g]2",
+    "wd": "",
+    "w1": "",
+    "w2": "",
+    "w3": "",
+    "w4": "",
+    "w5": "",
+    "w6": "",
+    "w7": "",
+    "w8": "",
+    "s1": "",
+    "s2": "",
+    "s3": "",
+    "f1": "",
+    "f2": "",
+    "f3": "",
+    "f4": "",
+    "f5": "",
+    "f6": "",
+    "smp": ""
+  },
+  "chips": [
+    "core",
+    "ex6"
+  ]
+}

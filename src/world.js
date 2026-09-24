@@ -71,15 +71,37 @@ export function resetWorld() {
   state.logQueue = [];
   state.mission = null;
   state.quiet = false;       // 撃破後：自機も撃たない
-  state.blackout = null;
   state.mid = null;          // 中ボス
   state.slowT = 0;           // 中ボス撃破のスロー
   state.warp = null;         // 面の区切りのワープ
   state.zoom = null;         // 最後の一枚 → 惑星へズーム
+  state.endPlanet = null;    // 最後の一枚の惑星（倒した瞬間の位置・大きさ）
+  state.endBoss = null;      // 最後の一枚の母船の位置
+  state.endArms = null;      // 最後の一枚の翼の位置
+  state.endPlayer = null;    // 最後の一枚の自機の位置
   state.ruins = null;        // 廃墟の街
   state.stage = 0;           // 面（0〜2）
   state.planet = 0.8;        // 奥の惑星の大きさ。面が進むほど近づく
+  state.titleMeteor = null;
+  state.titleMeteorWait = 240 + Math.floor(fxRng.rnd() * 180); // 初回は4〜7秒後
   for (const p of particles) p.alive = false;
+}
+
+// タイトルの流れ星。1本だけ流れ、次は長い間隔を空ける
+export function moveTitleMeteor() {
+  const m = state.titleMeteor;
+  if (m) {
+    m.x += m.vx; m.y += m.vy; m.age++;
+    if (m.x < -150 || m.y > CFG.H + 50) {
+      state.titleMeteor = null;
+      state.titleMeteorWait = 1500 + Math.floor(fxRng.rnd() * 900); // 次は25〜40秒後
+    }
+  } else if (--state.titleMeteorWait <= 0) {
+    state.titleMeteor = {
+      x: CFG.W + 20 + fxRng.rnd() * 120, y: 20 + fxRng.rnd() * 100,
+      vx: -15 - fxRng.rnd() * 3, vy: 3 + fxRng.rnd() * 1.2, age: 0,
+    };
+  }
 }
 
 // splice を毎フレーム回さない。alive フラグで詰める
@@ -138,8 +160,9 @@ export function movePopups() {
 export function flash(col, t = 12) { state.flash = { col, t, max: t }; }
 
 // ---- 信号：母船から惑星へ。電波のように飛び、届いても何も返ってこない（見た目だけ） ----
-// 背景の惑星の位置（描画と同じ）
-export const planetXY = () => [780 - (state.scroll * 0.02) % 40, 120];
+// 背景の惑星の位置（描画と同じ）。遠くにあるので動かさない
+// （以前はスクロールの剰余でずらしていて、40px ごとに跳ね戻っていた。ワープ中に目立つ）
+export const planetXY = () => [770, 120];
 // 受信アンテナの場所：惑星の夜側の1点（惑星の絵の中心からのずれ。絵の大きさ1のとき）
 // 信号はすべてここへ届く。最後の一枚で点滅している灯・ズームの先も同じ点
 export const RECEIVER = { dx: 70, dy: 57.5 };
@@ -159,6 +182,8 @@ export function sendSignal(x, y, tx, ty, kind = 'normal') {
 }
 export function moveSignals() {
   for (const s of state.signals) {
+    // 惑星は道中でゆっくり動く。発射時の座標ではなく、そのフレームの受信点へ届かせる。
+    [s.tx, s.ty] = receiverXY();
     s.t++;
     if (s.t === s.max) s.hit = 1;
     if (s.hit) s.hit++;

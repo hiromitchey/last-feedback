@@ -208,6 +208,7 @@ export function mokoSprite() {
 // part：'all' 全体 / 'body' 羽を除いた胴体 / 'up' 上の羽だけ / 'down' 下の羽だけ（撃破で羽がもげて落ちる）
 // どれも同じ大きさ・同じ座標で描くので、重ねれば 'all' と同じになる
 export const BOSS_ARM_ROOT = { up: [5, -35], down: [5, 35] };   // 羽の付け根（絵の中心からのずれ）
+export const BOSS_WINDOW = { x: -55, y: -14 };                    // 青い窓（信号の発信源）
 export function bossSprite(form, part = 'all') {
   const k = 'boss|' + form + '|' + part;
   let c = cache.get(k);
@@ -256,7 +257,7 @@ export function bossSprite(form, part = 'all') {
     g.fillStyle = dark;
     g.fillRect(m.x - 60, m.y + 14, 150, 12);
     g.fillStyle = '#4FC3F7';
-    g.beginPath(); g.ellipse(m.x - 55, m.y - 14, 34, 20, 0, 0, 7); g.fill();
+    g.beginPath(); g.ellipse(m.x + BOSS_WINDOW.x, m.y + BOSS_WINDOW.y, 34, 20, 0, 0, 7); g.fill();
     g.fillStyle = 'rgba(255,255,255,.85)';
     g.beginPath(); g.ellipse(m.x - 66, m.y - 22, 11, 6, 0, 0, 7); g.fill();
     // 後ろのスラスター

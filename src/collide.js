@@ -8,6 +8,7 @@ import { damagePlayer, gainLevel } from './player.js';
 import { scatter } from './items.js';
 import { onOrbBroken } from './story.js';
 import { fxRng } from './rng.js';
+import { playSfx } from './sfx.js';
 
 const hit = (a, b, ra, rb) => {
   const dx = a.x - b.x, dy = a.y - b.y, r = ra + rb;
@@ -45,6 +46,7 @@ function hitOrbs(b) {
 
 export function breakOrb(o) {
   o.alive = false;
+  playSfx('orb');
   onOrbBroken(o);                       // 断片が1行出る
   state.score += CFG.score.orb;
   scatter('kakera', o.boss ? CFG.orb.kakeraBoss : CFG.orb.kakera, o.x, o.y, 1.6, 3.2);
@@ -129,7 +131,7 @@ export function collide() {
       continue;
     }
     if (q.kind === 'slam') continue;                           // 叩きつけた文字には当たらない（崩れた弾が当たる）
-    if (q.kind !== 'col' && Math.abs(p.y - q.y0) > q.amp + 40) continue;
+    if (q.kind !== 'col' && q.kind !== 'ray' && q.kind !== 'burst' && q.kind !== 'drop' && Math.abs(p.y - q.y0) > q.amp + 40) continue;
     if (q.kind === 'col' && Math.abs(p.x - q.x0) > 60) continue;
     for (const c of q.chars) {
       if (c.space || c.sc < 0.5) continue;
@@ -151,6 +153,7 @@ export function collide() {
     checks++;
     if (!hit(it, p, CFG.item.r, CFG.item.pickR)) continue;
     it.alive = false;
+    playSfx(it.kind === 'kakera' ? 'kakera' : 'pickup');
     if (it.kind === 'way' || it.kind === 'pow') {
       state.score += CFG.score.item;
       gainLevel(it.kind);

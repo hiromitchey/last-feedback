@@ -5,6 +5,7 @@ import { state } from './world.js';
 import { gameRng } from './rng.js';
 import * as sched from './sched.js';
 import { parsePhrase } from './text.js';
+import { playSfx } from './sfx.js';
 
 const weightOf = arr => arr.reduce((n, b) => n + (b.hp ? CFG.bullet.orbWeight : 1), 0);
 // 同時弾の上限。道中は区間ごとにさらに低い（A 10 / B 16）
@@ -12,7 +13,8 @@ export const bulletCap = () => Math.min(CFG.bullet.cap, state.segCap ?? CFG.bull
 
 function push(x, y, ang, speed, col, opt = {}) {
   const w = opt.hp ? CFG.bullet.orbWeight : 1;
-  if (weightOf(state.eBullets) + w > bulletCap()) return null;             // 原則4
+  // 原則4。叩きつけた言葉が崩れた弾（force）は例外：上限で一部の文字だけ消えると言葉が読めなくなる
+  if (!opt.force && weightOf(state.eBullets) + w > bulletCap()) return null;
   const sp = Math.min(speed * state.diff.speed, CFG.bullet.speedMax);       // 原則2
   if (DEBUG && SPEED_OK[col]) console.assert(SPEED_OK[col](sp), `色${col}に速度${sp}は不正`);
   const b = {
@@ -53,13 +55,35 @@ export function fan(src, n, dir, spread, speed, col) {
   for (let i = 0; i < n; i++) push(src.x, src.y, dir + (i / (n - 1) - 0.5) * spread, speed, col);
 }
 
+// ---- 文字の弾（小さい弾の代わり）。1文字が1発。言葉が欠けると読めないので弾数の上限の例外（force） ----
+const W = () => CFG.wordShot;
+function charShot(x, y, ang, speed, col, ch) {
+  return push(x, y, ang, Math.min(speed, CFG.bullet.speedMax), col, { ch, px: W().px, r: W().r, force: true });
+}
+// 扇の形に1文字ずつ。左へ撃つときは、上の弾から順に読める
+export function wordFan(src, word, dir, spread, speed, col) {
+  const chars = [...word].filter(ch => ch !== ' ' && ch !== '　');
+  const n = chars.length;
+  if (dir === 'aim') dir = Math.atan2(state.player.y - src.y, state.player.x - src.x);
+  chars.forEach((ch, i) => charShot(src.x, src.y, dir + (n === 1 ? 0 : (0.5 - i / (n - 1)) * spread), speed, col, ch));
+}
+// 狙った1本の線に、1文字ずつ続けて撃つ（先頭の文字が一番前＝左から読める）
+export function* wordStream(src, word, speed, col, off = 0) {
+  const p = state.player;
+  const ang = Math.atan2(p.y - src.y, p.x - src.x) + off;
+  for (const ch of word) {
+    if (ch !== ' ' && ch !== '　') charShot(src.x, src.y, ang, speed, col, ch);
+    yield* sched.wait(Math.max(1, Math.round(W().gap * 2.8 / speed)));   // 速いほど詰める（文字の間隔をそろえる）
+  }
+}
+
 // 水平ビーム。必ず laserWarn（予告80f）を経る。2本なら間に80px以上（原則3・5）
 // 予告線のあと、文字の列が横一直線に高速で飛んでくる。1文字ずつ当たり判定がある
 // いま流れている声・ビーム・ビームの予告線が占めている上下の帯
 const LANE_GAP = 6;
 function occupiedBands() {
   const bands = [];
-  for (const q of state.phrases) if (q.alive && q.kind !== 'col') bands.push([q.y0 - q.half, q.y0 + q.half]);
+  for (const q of state.phrases) if (q.alive && q.kind !== 'col' && q.kind !== 'ray' && q.kind !== 'burst' && q.kind !== 'drop') bands.push([q.y0 - q.half, q.y0 + q.half]);
   const wh = CFG.laser.width / 2 + CFG.phrase.base * CFG.laser.maxTextSize / 2;
   for (const w of state.laserWarns) if (w.alive) bands.push([w.y - wh, w.y + wh]);
   return bands;
@@ -114,6 +138,7 @@ export function* laserWarn(src, count) {
 export function hLaser(src, text) {
   if (!src.pendingLaser) throw new Error('laserWarn を経ていない');
   const L = CFG.laser;
+  if (src.pendingLaser.length) playSfx('laser');
   for (const y of src.pendingLaser) {
     const q = phrase(src, text, { y, speed: L.textSpeed, amp: 0, col: COL.YELLOW, beam: true, maxSize: L.maxTextSize });
     q.life = 0; q.w = 0; q.srcX = src.x - 80;
@@ -168,6 +193,9 @@ export function phrase(src, text, opt = {}) {
 function layoutPhrase(q) {
   if (q.kind === 'slam') return layoutSlam(q);
   if (q.kind === 'col') return layoutCol(q);
+  if (q.kind === 'ray') return layoutRay(q);
+  if (q.kind === 'burst') return layoutBurst(q);
+  if (q.kind === 'drop') return layoutDrop(q);
   for (let i = 0; i < q.chars.length; i++) {
     const c = q.chars[i];
     c.x = q.x + c.dx;
@@ -185,6 +213,32 @@ export function movePhrases() {
   for (const q of state.phrases) {
     q.t++;
     if (q.kind === 'slam') { layoutSlam(q); if (q.t >= q.shatterAt) shatter(q); continue; }
+    if (q.kind === 'drop') {
+      q.y += q.dir * q.v;
+      layoutDrop(q);
+      if (q.dir > 0 ? q.y - q.half > CFG.H + 20 : q.y + q.half < -20) q.alive = false;
+      continue;
+    }
+    if (q.kind === 'burst') {
+      // 1文字出るたびにバシッ（音と小さな揺れ）。バシバシバシ…と続いて、最後の1文字だけ強く「バシッ！」
+      const lastAt = Math.max(...q.chars.filter(c => !c.space).map(c => c.at));
+      for (const c of q.chars) if (!c.space && c.at === q.t) {
+        playSfx('bashi');
+        if (c.at === lastAt) { playSfx('slam'); state.shake = Math.max(state.shake, 10); }
+        else state.shake = Math.max(state.shake, 5);
+      }
+      layoutBurst(q);
+      if (q.t > q.hold && q.chars.every(c => c.space || c.x < -80 || c.x > CFG.W + 80 || c.y < -80 || c.y > CFG.H + 80)) q.alive = false;
+      continue;
+    }
+    if (q.kind === 'ray') {
+      q.head += q.v;
+      layoutRay(q);
+      // 全部の文字が画面の外に出たら終わり（残っていると次の声がずっと待たされる）
+      const out = c => c.x < -60 || c.x > CFG.W + 60 || c.y < -60 || c.y > CFG.H + 60;
+      if (q.head - q.len > CFG.ray.maxDist || (q.head > q.len && q.chars.every(c => c.space || out(c)))) q.alive = false;
+      continue;
+    }
     if (q.kind === 'col') {
       q.y += q.dir * q.v;
       layoutCol(q);
@@ -231,6 +285,7 @@ export function slam(src, text, opt = {}) {
   layoutSlam(q);
   state.phrases.push(q);
   state.shake = Math.max(state.shake, 8);
+  playSfx('slam');
   return q;
 }
 function layoutSlam(q) {
@@ -251,7 +306,7 @@ function shatter(q) {
   q.chars.forEach((c, i) => {
     if (c.space) return;
     const a = Math.atan2(p.y - c.y, p.x - c.x) + (i - (q.chars.length - 1) / 2) * S.spread;
-    push(c.x, c.y, a, S.speed, q.col, { ch: c.ch, px: Math.min(c.px, S.bulletPx), r: S.bulletR });
+    push(c.x, c.y, a, S.speed, q.col, { ch: c.ch, px: Math.min(c.px, S.bulletPx), r: S.bulletR, force: true });
   });
 }
 
@@ -285,6 +340,123 @@ function layoutCol(q) {
     c.y = q.y + c.dy;
     c.rot = c.tilt;
     c.sc = 1;
+  }
+}
+
+// ---- 扇の言葉：母船の口から、言葉が扇状に何本も出てきて、放射状に広がっていく ----
+// 1本の線に1つの言葉。文字は線に沿って並び、口から1文字ずつ出てくる。広がるほど線の間があく（そこを抜ける）
+// 文字はまっすぐ立てたまま。左向きの線は左から、下向きの線は上から読めるように並べる
+export function ray(src, texts, opt = {}) {
+  const R = CFG.ray, n = texts.length;
+  const ox = src.x - 80, oy = src.y;
+  for (let k = 0; k < n; k++) {
+    const ang = Math.PI + (n === 1 ? 0 : (k / (n - 1) * 2 - 1) * R.spread);
+    rayWord(ox, oy, ang, texts[k], opt);
+  }
+}
+function rayWord(ox, oy, ang, text, opt) {
+  const F = CFG.phrase, R = CFG.ray;
+  const chars = parsePhrase(text, () => gameRng.rnd());
+  const dx = Math.cos(ang), dy = Math.sin(ang);
+  const order = dy > Math.abs(dx) ? [...chars].reverse() : chars;   // 下向きの線は、1文字目を口の側（上）に
+  let o = 0;
+  for (const c of order) {
+    const w = F.base * c.size * (c.space ? 0.5 : 1.0);
+    c.off = o + w / 2;                                // 先頭からの距離
+    c.px = Math.round(F.base * c.size);
+    c.r = c.space ? 0 : F.base * c.size * F.hitRatio;
+    c.tilt = (gameRng.rnd() - 0.5) * 0.12;
+    o += w;
+  }
+  const q = { kind: 'ray', chars, ox, oy, dx, dy, head: 0, len: o, v: (opt.speed ?? R.speed) * state.diff.speed,
+    col: opt.col ?? COL.CYAN, t: 0, alive: true };
+  layoutRay(q);
+  state.phrases.push(q);
+}
+function layoutRay(q) {
+  for (const c of q.chars) {
+    const d = q.head - c.off;                         // 口からの距離。まだ口の中なら見せない
+    c.x = q.ox + q.dx * Math.max(0, d); c.y = q.oy + q.dy * Math.max(0, d);
+    c.rot = c.tilt + Math.sin(q.t * 0.08 + c.off) * 0.04;
+    c.sc = d <= 0 ? 0 : Math.min(1, d / 24);          // 口から出るときにふくらむ
+  }
+}
+
+// ---- でっかい言葉が上から（下から）速く来る：横書きのまま縦に動く。左右によける ----
+// 出る前に、言葉の左右の端の位置に予告の点線
+export function* bigDrop(src, text, opt = {}) {
+  const F = CFG.phrase, D = CFG.drop;
+  const chars = parsePhrase(text, () => gameRng.rnd());
+  let x = 0;
+  for (const c of chars) {
+    c.size *= D.sizeMul;
+    const w = F.base * c.size * (c.space ? 0.5 : 0.9);
+    c.dx = x + w / 2; c.px = Math.round(F.base * c.size);
+    c.r = c.space ? 0 : F.base * c.size * F.hitRatio;
+    c.tilt = (gameRng.rnd() - 0.5) * 0.16;
+    x += w;
+  }
+  const dir = opt.dir ?? 1, half = Math.max(...chars.map(c => c.px)) / 2;
+  const x0 = Math.max(x / 2 + 10, Math.min(CFG.W - x / 2 - 120, opt.x ?? CFG.W / 2));   // 母船にかからない範囲
+  const warns = [x0 - x / 2, x0 + x / 2].map(wx => ({ x: wx, t: D.warn, dir, alive: true }));
+  state.colWarns.push(...warns);
+  yield* sched.wait(D.warn);
+  for (const w of warns) w.alive = false;
+  const q = { kind: 'drop', chars, width: x, half, x0, dir, y: dir > 0 ? -half - 10 : CFG.H + half + 10,
+    v: D.speed * state.diff.speed, col: opt.col ?? COL.VIOLET, t: 0, alive: true };
+  layoutDrop(q);
+  state.phrases.push(q);
+  playSfx('slam');
+}
+function layoutDrop(q) {
+  for (const c of q.chars) {
+    c.x = q.x0 - q.width / 2 + c.dx; c.y = q.y;
+    c.rot = c.tilt + Math.sin(q.t * 0.2 + c.dx) * 0.05;
+    c.sc = 1;
+  }
+}
+
+// ---- 弾ける言葉：母船のまわりに弧を描いて1行が縦に並び、しばらく読ませる → 3回点滅 → 1文字ずつ
+// ものすごい速さでくるくる回りながら、大きくなって放射状に飛び散る
+export function burst(src, text, opt = {}) {
+  const F = CFG.phrase, B = CFG.burst;
+  const chars = parsePhrase(text, () => gameRng.rnd());
+  const ox = src.x + B.dx, oy = src.y;              // 母船の中心あたりを囲む
+  // 弧の長さ＝文字の大きさの合計。弧が開きすぎるときは半径を大きくする
+  let L = 0;
+  for (const c of chars) { c.len = F.base * c.size * (c.space ? 0.6 : 1.0); L += c.len; }
+  const R0 = Math.max(B.radius, L / (B.maxSpan * 2));
+  const span = L / R0;
+  let s = 0;
+  chars.forEach((c, i) => {
+    c.ang = Math.PI + span / 2 - (s + c.len / 2) / R0;   // 上から下へ（左側の弧）
+    s += c.len;
+    c.px = Math.round(F.base * c.size);
+    c.r = c.space ? 0 : F.base * c.size * F.hitRatio;
+    c.spin = (i % 2 ? 1 : -1) * (B.spin * (0.85 + gameRng.rnd() * 0.3));  // くるくる激しく（向きは交互）
+    c.at = 1 + i * B.typeGap;                         // 1文字ずつ、バシッと現れる
+  });
+  const q = { kind: 'burst', src, chars, ox, oy, R0, hold: chars.length * B.typeGap + B.hold + B.blinks * B.blinkPeriod,
+    col: opt.col ?? COL.VIOLET, t: 0, alive: true };
+  layoutBurst(q);
+  state.phrases.push(q);
+  return q;
+}
+function layoutBurst(q) {
+  const B = CFG.burst, k = Math.max(0, q.t - q.hold);
+  // 飛び出すまでは母船について動く。点滅は飛び出す直前の blinks 回
+  if (q.t <= q.hold && q.src) { q.ox = q.src.x + B.dx; q.oy = q.src.y; }
+  const b0 = q.hold - B.blinks * B.blinkPeriod;
+  const off = q.t >= b0 && q.t < q.hold && (q.t - b0) % B.blinkPeriod >= B.blinkPeriod / 2;
+  // 飛び散る距離：だんだん速く（上限は弾の最高速）
+  const d = q.R0 + Math.min(B.speed * k + B.acc * k * k / 2, B.speedMax * k);
+  const grow = 1 + Math.min(B.grow, (d - q.R0) / B.growDist);
+  for (const c of q.chars) {
+    c.x = q.ox + Math.cos(c.ang) * d; c.y = q.oy + Math.sin(c.ang) * d;
+    c.rot = c.spin * k;
+    // 大きく出て一気に縮んで止まる（叩きつけるようにバシッ）。飛ぶほど大きく
+    const u = Math.min(1, Math.max(0, (q.t - c.at) / 6));
+    c.sc = off || q.t < c.at ? 0 : (1 + 1.1 * (1 - u) * (1 - u)) * grow;
   }
 }
 

@@ -8,6 +8,7 @@ import { damageEnemy } from './enemies.js';
 import { breakOrb } from './collide.js';
 import { bombBoss } from './boss.js';
 import { midTargetable, damageMid } from './midboss.js';
+import { playSfx } from './sfx.js';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
@@ -57,6 +58,7 @@ export function shoot() {
   }
   if (!want || p.shotCd > 0) return;
   p.shotCd = CFG.player.shotInterval;
+  playSfx('shot');
   if (EN.enabled) {
     p.energy -= EN.cost[p.lv.way];
     if (p.energy <= 0) {
@@ -101,6 +103,7 @@ export function gainLevel(kind) {
 }
 
 function levelUpFx(p, kind) {
+  playSfx('level');
   const col = LV_COL[kind];
   flash(col, 14);
   p.gradeFx = 40; p.gradeFxCol = col;
@@ -116,6 +119,7 @@ export function fireBomb(auto = false) {
   const p = state.player;
   if (p.bombs <= 0) return false;
   p.bombs--;
+  playSfx('bomb');
   const BM = CFG.bomb;
   p.invincible = Math.max(p.invincible, BM.invincible);
   for (const b of state.eBullets) { if (b.hp && b.alive) breakOrb(b); else b.alive = false; }
@@ -138,6 +142,7 @@ export function damagePlayer() {
   if (p.invincible > 0 || state.debugInvincible) return;
   // オートボム：被弾を確定させる前にボムを見る（確定してから取り消すと演出が二重に走る）
   if (state.autoBomb && fireBomb(true)) return;
+  playSfx('damage');
   p.lives--;
   p.invincible = CFG.player.invincible;
   state.shake = 14;

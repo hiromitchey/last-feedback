@@ -46,7 +46,9 @@ export const CFG = {
     // ゆがみ：壊れてから作られた小さなもの。編隊を組まず、不規則に揺れたり止まったりする
     guni: { hp: 6, r: 14, size: 44, speed: 2.2, score: 150 },
     // 子機：母船の「ハイジョセヨ」で出てくる小さな兄弟機
-    chibi: { hp: 2, r: 10, size: 30, speed: 2.8, score: 50, max: 10, count: [4, 5, 6] },
+    chibi: { hp: 2, r: 10, size: 30, speed: 2.8, score: 50, max: 10, count: [4, 5, 6],
+      // 縦一列：lineN 体を lineGap 間隔で縦に並べ（自機の高さの1つだけ空ける）、lineForm フレームでそろえてから左へ
+      lineN: 7, lineGap: 64, lineX: 560, lineForm: 50, lineSpeed: 2.2 },
   },
 
   // 道中2区間。切り替えは「全滅」かつ「最低時間の経過」
@@ -62,6 +64,16 @@ export const CFG = {
   slam: { stamp: 12, hold: 42, sizeMul: 2.2, spread: 0.12, speed: 2.0, bulletPx: 30, bulletR: 8 },
   // 縦書き：予告の点線 warn のあと、上から降る／下から上がる（水色＝遅い）
   col: { warn: 36, speed: 1.9 },
+  // 扇の言葉：母船の口から扇状（左を中心に上下 spread ラジアン）に言葉が出て、放射状に広がる（水色＝遅い）
+  // でっかい言葉が上から／下から速く来る（横書きのまま縦に動く）。予告 warn フレーム
+  drop: { sizeMul: 1.4, speed: 4.0, warn: 40 },
+  ray: { speed: 1.7, spread: 1.05, maxDist: 1200, busyDist: 380 },   // busyDist：ここまで広がったら次の声を出してよい
+  // 母船の文字の弾（小さい弾の代わり）：文字の大きさ px・判定 r、続けて撃つときの間隔 gap（速さ2.8のときのフレーム）
+  wordShot: { px: 26, r: 8, gap: 9 },
+  // 弾ける言葉：母船のまわりの弧（中心は母船＋dx、半径 radius、片側 maxSpan ラジアンまで）に1行並べ、hold 見せて
+  // blinks 回点滅（blinkPeriod フレームごと）してから飛び散る。くるくる spin（ラジアン/フレーム）、飛ぶほど大きく（growDist ごとに +1、最大 +grow）
+  burst: { dx: -10, radius: 190, maxSpan: 1.8, typeGap: 9, hold: 30, blinks: 3, blinkPeriod: 14,
+    speed: 1.4, acc: 0.04, speedMax: 3.2, spin: 0.55, grow: 1.4, growDist: 260, busyAfter: 50 },   // 飛び散って busyAfter フレームで次の声へ
   // ボスの声（言葉のかたまり）。base は標準の文字の大きさ(px)、判定は文字の大きさ×hitRatio
   phrase: { base: 24, speed: 1.9, amp: 42, wavelength: 360, hitRatio: 0.3, max: 3,
     bigSpeed: 1.0, bigMul: 1.35,      // でっかい文字：ゆーっくり（{{}} 2.6 × 1.35 ≒ 84px）
@@ -75,6 +87,8 @@ export const CFG = {
     weaken: [[30 * 60, 1.3], [45 * 60, 1.6], [60 * 60, 2.0]],   // 形態3が長引くと発射間隔が伸びる
     coreScore: 5000, formBonus: 8000, killScore: 20000,
     timeBonus: { full: 20000, within: 90, perSec: 200 },
+    finalDim: 240,                   // 最後の信号を送り始めてから船体が暗くなるまで
+    beaconFade: 90,                 // 最後の信号のあと、青い窓が消えるまで
   },
 
   // 中ボス（面ごと）。倒すと母船の記録が出る
@@ -93,7 +107,9 @@ export const CFG = {
 
   scroll: 2.0,
   warpFrames: 90,             // 面の区切りのワープ
+  ruinsLineHold: 300,         // 廃墟の「オウトウ・・・セヨ・・・」を出し切ってから消え始めるまで（約5秒。ふつうの行は150）
   finalCallType: 16,          // 「オウトウ・・・セヨ・・・」の1文字あたりのフレーム（ゆっくり）
+  ruinsFade: 360,             // 廃墟の最後の一言のあと、約6秒かけて暗転
   // 母船から惑星への信号の間隔（面ごと）。面が進むほど必死になる
   signalEvery: [900, 720, 540],   // たまに（15秒 / 12秒 / 9秒）
 

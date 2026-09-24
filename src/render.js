@@ -11,7 +11,7 @@ import { RETRO_FONT, STORY } from './text.js';
 
 // ボスの灯の位置（ボスの絵の中心からのずれ）
 const BOSS_LIGHTS = [
-  [-55, -14, '#4FC3F7'], [-100, 0, '#FFD54F'], [-30, -106, '#FF5C8A'],
+  [S.BOSS_WINDOW.x, S.BOSS_WINDOW.y, '#4FC3F7'], [-100, 0, '#FFD54F'], [-30, -106, '#FF5C8A'],
   [-30, 106, '#4FC3F7'], [122, -34, '#FF9E3D'], [122, 34, '#FF9E3D'],
 ];
 
@@ -71,6 +71,23 @@ function drawBackground() {
       ctx.fillRect(x, p.y, len(p), p.s);
     }
   }
+  if (state.mode === 'title') drawTitleMeteor();
+}
+
+function drawTitleMeteor() {
+  const m = state.titleMeteor;
+  if (!m) return;
+  const tailX = m.x - m.vx * 8, tailY = m.y - m.vy * 8;
+  const trail = ctx.createLinearGradient(tailX, tailY, m.x, m.y);
+  trail.addColorStop(0, 'rgba(190,225,255,0)');
+  trail.addColorStop(0.6, 'rgba(190,225,255,.4)');
+  trail.addColorStop(1, '#fff');
+  ctx.save();
+  ctx.globalAlpha = Math.min(1, m.age / 8);
+  ctx.strokeStyle = trail; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(tailX, tailY); ctx.lineTo(m.x, m.y); ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(m.x, m.y, 2.5, 0, 7); ctx.fill();
+  ctx.restore();
 }
 
 function blit(img, x, y, rot = 0, scale = 1) {
@@ -250,17 +267,12 @@ function drawArm(form, side, cx, cy, a) {
   ctx.drawImage(img, -img.w / 2 - rx, -img.h / 2 - ry, img.w, img.h);
   ctx.restore();
 }
-// ヒビ：羽の付け根を走るジグザグ
-function drawCrack(cx, cy, side, u) {
-  const sy = side === 'up' ? -1 : 1;
-  const [rx, ry] = S.BOSS_ARM_ROOT[side];
-  const pts = [[-40, 0], [-24, 6], [-10, -5], [4, 6], [18, -4], [34, 3]];
-  const n = Math.max(2, Math.round(pts.length * u));
-  ctx.strokeStyle = '#1a1424'; ctx.lineWidth = 5; ctx.lineJoin = 'round';
-  ctx.beginPath();
-  pts.slice(0, n).forEach(([x, y], i) => (i ? ctx.lineTo(cx + rx + x, cy + ry + y * sy) : ctx.moveTo(cx + rx + x, cy + ry + y * sy)));
-  ctx.stroke();
-  ctx.strokeStyle = '#FFD54F'; ctx.lineWidth = 1.5; ctx.stroke();
+
+function drawDarkBossWindow(cx, cy, alpha = 0.9) {
+  ctx.save();
+  ctx.globalAlpha = alpha; ctx.fillStyle = '#171a2e';
+  ctx.beginPath(); ctx.ellipse(cx + S.BOSS_WINDOW.x, cy + S.BOSS_WINDOW.y, 34, 20, 0, 0, 7); ctx.fill();
+  ctx.restore();
 }
 
 function drawDebris() {
@@ -380,10 +392,12 @@ function drawPlate(x, y, col, ratio, flashT) {
 function drawBoss() {
   const b = state.boss;
   if (!b) return;
-  // 撃破中は灯が消えていくように暗くする
-  // 撃破後：灯が消えるほど暗くなる
+  // 2つの問いの間は明るい。最後の信号を送りながら船体が暗くなる
   const lit = b.lights ?? LIGHTS;
-  if (b.dying) ctx.globalAlpha = 0.4 + 0.6 * lit / LIGHTS;
+  if (b.dying) {
+    const u = Math.min(1, (b.finalDim ?? 0) / CFG.boss.finalDim);
+    ctx.globalAlpha = 1 - 0.6 * u * u * (3 - 2 * u);
+  }
   const jit = 0;
   if (b.hitFlash) ctx.globalAlpha *= 0.75;
   const form = b.drawForm ?? b.form;
@@ -397,11 +411,10 @@ function drawBoss() {
     for (const side of ['up', 'down']) if (hanging(side)) drawArm(form, side, b.x + 20, b.y, b.arms[side]);
   } else blit(S.bossSprite(form), b.x + jit + 20, b.y);
   ctx.globalAlpha = 1;
-  for (const [side, c] of Object.entries(b.cracks || {}))
-    if (!(b.arms && b.arms[side] && b.arms[side].t > 18 && !b.arms[side].hang)) drawCrack(b.x + 20, b.y, side, c / 30);
   // 灯（窓・スラスター・腕の先）。撃破後、ひとつずつ消える。折れたら半分ごとに付いていく
   BOSS_LIGHTS.forEach(([dx, dy, col], i) => {
     if (i >= lit) return;
+    if (i === 0 && b.dying) return; // 爆発中の窓には、通信のように見える点光を出さない
     // 羽の先の灯は、羽と一緒に落ちて消える
     const side = dy < -90 ? 'up' : dy > 90 ? 'down' : null;
     const arm = side && b.arms && b.arms[side];
@@ -427,12 +440,25 @@ function drawBoss() {
     if (p.glow > 0) drawCharge(p);
   }
   if (b.glow > 0) drawCharge({ x: b.x - 40, y: b.y, r: 40, glow: b.glow });
-  // 最後の発信の前触れ：灯の消えた船体に、小さな灯がひとつ点滅して点く
+  // 青い窓は台詞の間も見える。発信後、船体と一緒にゆっくり暗くする
+  if (b.dying && lit === 0 && b.finalDim != null) {
+    const u = Math.min(1, b.finalDim / CFG.boss.finalDim);
+    drawDarkBossWindow(b.x + 20, b.y, 0.9 * u * u * (3 - 2 * u));
+  }
+  // 最後の発信の前触れ：青い窓が点滅して点く。信号もこの窓から出る
   if (b.beacon) {
     const on = b.beacon.t > 36 || ((b.beacon.t >> 3) & 1);
     if (on) {
-      ctx.globalAlpha = 0.5; ctx.fillStyle = '#9fe8ff'; ctx.beginPath(); ctx.arc(b.x + 20, b.y - 50, 10, 0, 7); ctx.fill();
-      ctx.globalAlpha = 1; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(b.x + 20, b.y - 50, 3.5, 0, 7); ctx.fill();
+      const x = b.x + 20 + S.BOSS_WINDOW.x, y = b.y + S.BOSS_WINDOW.y;
+      const u = Math.min(1, (b.beacon.fadeT ?? 0) / CFG.boss.beaconFade);
+      const glow = 1 - u * u * (3 - 2 * u);
+      ctx.globalAlpha = 0.24 * glow; ctx.fillStyle = '#9fe8ff';
+      ctx.beginPath(); ctx.ellipse(x, y, 46, 28, 0, 0, 7); ctx.fill();
+      ctx.globalAlpha = 0.78 * glow; ctx.fillStyle = '#4FC3F7';
+      ctx.beginPath(); ctx.ellipse(x, y, 32, 18, 0, 0, 7); ctx.fill();
+      ctx.globalAlpha = 0.9 * glow; ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(x - 11, y - 6, 10, 5, 0, 0, 7); ctx.fill();
+      ctx.globalAlpha = 1;
     }
   }
   // 自己修正：飛んでくる板と「シュウセイ nカイメ」
@@ -637,7 +663,7 @@ function drawStoryText() {
   }
   const M = state.mission;
   if (M) {
-    // MISSION / イジョウヲ ハイジョセヨ（タイプライター）
+    // MISSION / イジョウヲ ハイジョセヨ（タイプライター。文字送りの音は story.js moveStory が同じ式で鳴らす）
     const a = Math.min(1, (200 - M.t) / 30);
     ctx.globalAlpha = Math.max(0, a);
     const [h, body] = STORY.mission;
@@ -646,30 +672,34 @@ function drawStoryText() {
     text([...body].slice(0, n).join(''), CFG.W / 2, CFG.H / 2 + 16, 30, '#fff', 'center', 'rgba(20,16,36,.9)', RETRO_FONT);
     ctx.globalAlpha = 1;
   }
-  if (state.blackout) {
-    ctx.globalAlpha = Math.min(1, state.blackout.t / 90);
-    ctx.fillStyle = '#000'; ctx.fillRect(-20, -20, CFG.W + 40, CFG.H + 40);
-    ctx.globalAlpha = 1;
-  }
 }
 
 // ---- 最後の一枚。止まった母船、残骸、灯りのない惑星。一台だけ、まだ動いている ----
-// ---- 最後の一枚。止まった母船、残骸、灯りのない惑星。一台だけ、まだ動いている ----
 // 惑星の夜側には、灯がひとつだけ点滅している。惑星を触ると、その灯へズームして廃墟の街へ
-export const END_PLANET = { x: 780, y: 160, scale: 1.6 };
+// 最後の一枚の惑星は、母船を倒した瞬間の背景の惑星と同じ位置・同じ大きさ（場面が変わっても動かない）
+const endPlanet = () => {
+  if (state.endPlanet) return state.endPlanet;
+  const [x, y] = planetXY();
+  return { x, y, scale: PLANET_BG_SCALE * (state.planet ?? 1) };
+};
 // 夜側の、ただひとつの灯＝受信アンテナ（信号が届く点と同じ）
-const END_LIGHT = { x: END_PLANET.x + RECEIVER.dx * END_PLANET.scale, y: END_PLANET.y + RECEIVER.dy * END_PLANET.scale };
+const endLight = () => { const P = endPlanet(); return { x: P.x + RECEIVER.dx * P.scale, y: P.y + RECEIVER.dy * P.scale }; };
 export const ZOOM_FRAMES = 80;
 export function onPlanet(p) {
-  const r = S.PLANET_R * END_PLANET.scale, dx = p.x - END_PLANET.x, dy = p.y - END_PLANET.y;
+  const P = endPlanet();
+  const r = S.PLANET_R * P.scale, dx = p.x - P.x, dy = p.y - P.y;
   return dx * dx + dy * dy < r * r;
 }
 
 function drawEnding() {
   if (state.ruins) { drawRuins(); return; }
   const t = state.endT;
-  // 惑星に乗せると指のカーソル（触れると分かるように）
-  cv.style.cursor = !state.zoom && input.mode === 'pointer' && onPlanet({ x: input.tx, y: input.ty }) ? 'pointer' : 'default';
+  const END_PLANET = endPlanet(), END_LIGHT = endLight();
+  const EB = state.endBoss ?? { x: 660, y: 380 };      // 母船も、漂い着いた位置のまま
+  const EA = state.endArms ?? { up: { x: 0, y: 0, rot: HANG_ROT }, down: { x: -170, y: 100, rot: 0.9 } };
+  const EP = state.endPlayer ?? { x: 250, y: 280 };
+  const planetHover = !state.zoom && input.mode === 'pointer' && onPlanet({ x: input.tx, y: input.ty });
+  cv.style.cursor = planetHover ? 'pointer' : 'default';
   ctx.save();
   if (state.zoom) {
     // 夜側の灯へズーム
@@ -678,40 +708,78 @@ function drawEnding() {
     ctx.translate(END_LIGHT.x + (CFG.W / 2 - END_LIGHT.x) * cm, END_LIGHT.y + (CFG.H / 2 - END_LIGHT.y) * cm);
     ctx.scale(z, z); ctx.translate(-END_LIGHT.x, -END_LIGHT.y);
   }
-  ctx.fillStyle = '#07080f'; ctx.fillRect(-CFG.W, -CFG.H, CFG.W * 3, CFG.H * 3);
-  for (const L of layers) {
-    ctx.fillStyle = `rgba(200,210,255,${L.a * 0.7})`;
-    for (const p of L.pts) if (p.x < CFG.W) ctx.fillRect(p.x, p.y, p.s, p.s);
+  if (state.zoom) {
+    // ズームの開始時も、直前の星空と惑星を同じ座標で描く
+    ctx.fillStyle = '#171a2e'; ctx.fillRect(-CFG.W, -CFG.H, CFG.W * 3, CFG.H * 3);
+    blit(S.planetSprite(), END_PLANET.x, END_PLANET.y, 0, END_PLANET.scale);
+    for (const L of layers) {
+      ctx.fillStyle = `rgba(200,210,255,${L.a})`;
+      const off = (state.scroll * L.speed) % 1920;
+      for (const p of L.pts) {
+        let x = p.x - off; if (x < -10) x += 1920;
+        if (x <= CFG.W + 10) ctx.fillRect(x, p.y, p.s, p.s);
+      }
+    }
   }
-  blit(S.planetSprite(), END_PLANET.x, END_PLANET.y, 0, END_PLANET.scale);
+  // 最後の一枚だけ、惑星の縁がゆっくり呼吸する。触れられる場所だと絵で知らせる
+  const pulse = (1 + Math.sin(t * 0.035)) / 2;
+  if (!state.zoom) {
+    const cue = Math.min(1, Math.max(0, (t - 90) / 90));
+    ctx.save();
+    ctx.globalAlpha = cue * (planetHover ? 0.8 : 0.35 + pulse * 0.2);
+    ctx.strokeStyle = '#9fe8ff'; ctx.lineWidth = planetHover ? 3.5 : 2.5;
+    ctx.shadowColor = '#9fe8ff'; ctx.shadowBlur = planetHover ? 26 : 16;
+    ctx.beginPath(); ctx.arc(END_PLANET.x, END_PLANET.y, S.PLANET_R * END_PLANET.scale + 5, 0, 7); ctx.stroke();
+    ctx.restore();
+  }
   // 夜側の、ただひとつの灯（ゆっくり点滅）
+  const reveal = Math.min(1, t / 90);
   const blink = 0.35 + 0.65 * Math.max(0, Math.sin(t * 0.05));
-  ctx.globalAlpha = blink * 0.35; ctx.fillStyle = '#9fe8ff'; ctx.beginPath(); ctx.arc(END_LIGHT.x, END_LIGHT.y, 9, 0, 7); ctx.fill();
-  ctx.globalAlpha = blink * 0.7; ctx.beginPath(); ctx.arc(END_LIGHT.x, END_LIGHT.y, 4, 0, 7); ctx.fill();
-  ctx.globalAlpha = blink; ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(END_LIGHT.x, END_LIGHT.y, 2, 0, 7); ctx.fill();
+  ctx.globalAlpha = reveal * blink * (planetHover ? 0.55 : 0.3); ctx.fillStyle = '#9fe8ff';
+  ctx.beginPath(); ctx.arc(END_LIGHT.x, END_LIGHT.y, 13 + pulse * 9, 0, 7); ctx.fill();
+  ctx.globalAlpha = reveal * blink * 0.7; ctx.beginPath(); ctx.arc(END_LIGHT.x, END_LIGHT.y, 4, 0, 7); ctx.fill();
+  ctx.globalAlpha = reveal * blink; ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(END_LIGHT.x, END_LIGHT.y, 2, 0, 7); ctx.fill();
   ctx.globalAlpha = 1;
   if (!state.zoom) {
     // 止まった母船。継ぎ接ぎだらけ
-    ctx.globalAlpha = 0.55;
-    blit(S.bossSprite(3, 'body'), 640, 330);
-    drawArm(3, 'up', 640, 330, { x: 0, y: 0, rot: HANG_ROT + Math.sin(t * 0.03) * 0.04 });   // 落ちそうなまま、ぶら下がっている
-    drawArm(3, 'down', 600, 330, { x: 200, y: 90, rot: 0.9 });   // もげた羽が漂っている
+    ctx.globalAlpha = 0.4;
+    drawArm(3, 'down', EB.x, EB.y, EA.down);   // もげた羽は落ちた位置のまま
+    blit(S.bossSprite(3, 'body'), EB.x, EB.y);
+    drawArm(3, 'up', EB.x, EB.y, { ...EA.up, rot: EA.up.rot + Math.sin(t * 0.03) * 0.04 });   // 落ちそうなまま、ぶら下がっている
     ctx.globalAlpha = 1;
+    drawDarkBossWindow(EB.x, EB.y);
     // 残骸：動かない船。番号が読める
     const wrecks = [[470, 110, 0.5], [860, 440, 2.4], [330, 470, -0.8], [560, 500, 1.2]];
     const puni = S.puniSprite();
     STORY.wrecks.forEach((num, i) => {
       const [x, y, r] = wrecks[i];
-      ctx.globalAlpha = 0.5;
+      ctx.globalAlpha = reveal * 0.5;
       blit(puni, x, y, r);
-      ctx.globalAlpha = 0.8;
+      ctx.globalAlpha = reveal * 0.8;
       text(num, x, y + 16, 11, '#cfd6ff', 'center', 'rgba(7,8,15,.9)', RETRO_FONT);
       ctx.globalAlpha = 1;
     });
-    // 自機。船体に 047
-    const py = 280 + Math.sin(t * 0.03) * 6;
-    blit(S.playerSprite(state.player.lv.way), 250, py);
-    text('047', 244, py + 15, 12, '#2a2140', 'center', 'rgba(255,255,255,.9)', RETRO_FONT);
+    // 自機。番号は書かない（047 は明かさない）。操作に合わせて動く（main.js moveEndPlayer）
+    const py = EP.y + Math.sin(t * 0.03) * 6;
+    blit(S.playerSprite(state.player.lv.way), EP.x, py);
+  }
+  // ズームが始まると、自機は惑星の方へ降りていき、小さくなって見えなくなる（「あの星に行ってみた」くらい）。
+  // 灯（受信アンテナ）には向かわない。そのあとに届く信号が自機に見えないよう、灯から離れた惑星の昼側へ
+  // 向かい、灯に寄る前に消える。ズームと同じ座標で描くので惑星と一緒に近づく
+  if (state.zoom) {
+    const zu = state.zoom.t / ZOOM_FRAMES, z = 1 + zu * zu * zu * 14;
+    // 前半で惑星の上まで行き（move）、その上で小さくなりながら薄れて消える（fade）
+    const LEN = ZOOM_FRAMES * 0.55, u = Math.min(1, state.zoom.t / LEN);
+    const m = Math.min(1, u / 0.6), e = m * m * (3 - 2 * m);
+    if (u < 1) {
+      const pr = S.PLANET_R * END_PLANET.scale;
+      const tx = END_PLANET.x - pr * 0.35, ty = END_PLANET.y - pr * 0.25;   // 昼側の真ん中あたり
+      const sx = EP.x, sy = EP.y + Math.sin(t * 0.03) * 6;
+      const x = sx + (tx - sx) * e, y = sy + (ty - sy) * e;
+      ctx.globalAlpha = u > 0.6 ? (1 - u) / 0.4 : 1;
+      blit(S.playerSprite(state.player.lv.way), x, y, 0, (1 - 0.7 * u) / z);   // 向きは変えない
+      ctx.globalAlpha = 1;
+    }
   }
   ctx.restore();
   // ズームの終わりは暗く
@@ -719,17 +787,16 @@ function drawEnding() {
     const u = state.zoom.t / ZOOM_FRAMES;
     ctx.globalAlpha = Math.max(0, (u - 0.6) / 0.4); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, CFG.W, CFG.H); ctx.globalAlpha = 1;
   }
-  // フェードイン
-  if (t < 120) { ctx.globalAlpha = 1 - t / 120; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, CFG.W, CFG.H); ctx.globalAlpha = 1; }
 }
 
 // ---- 廃墟の街。受信アンテナの灯だけが点滅している。空から信号が1つ降りてきて、届く ----
-const RUINS_WAIT = 300;                           // しばらくは、ただの廃墟（約5秒）
-const RUINS_TRAVEL = 240;                         // そのあと、ふよふよ降りてくる（約4秒）
+export const RUINS_WAIT = 300;                           // しばらくは、ただの廃墟（約5秒）
+export const RUINS_TRAVEL = 240;                         // そのあと、ふよふよ降りてくる（約4秒）
 export const RUINS_RECEIVE = RUINS_WAIT + RUINS_TRAVEL;   // 信号がアンテナに届くフレーム
-const RUINS_PULSES = [0, 80, 160];                        // 受信のあと、ほわ…ほわ…ほわ…（脈打つ間隔）
+// 届いて「入ったな」と思える間（約3.3秒）を置いてから、ほわ…ほわ…ほわ…と脈打つ（受信からのフレーム）
+export const RUINS_PULSES = [200, 280, 360];
 const RUINS_PULSE_LEN = 100;
-export const RUINS_LINE_AT = RUINS_RECEIVE + 160 + RUINS_PULSE_LEN + 40;   // 余韻が終わってから文字
+export const RUINS_LINE_AT = RUINS_RECEIVE + RUINS_PULSES[2] + RUINS_PULSE_LEN + 220;   // 余韻が終わって、しばらく（約3.7秒）静かにしてから文字
 function drawRuins() {
   cv.style.cursor = 'default';
   const t = state.ruins.t, L = S.DISH_LIGHT;
@@ -767,5 +834,11 @@ function drawRuins() {
   drawStoryText();
   // フェードイン／終わりの暗転
   if (t < 60) { ctx.globalAlpha = 1 - t / 60; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, CFG.W, CFG.H); ctx.globalAlpha = 1; }
-  if (state.ruins.fade) { ctx.globalAlpha = Math.min(1, state.ruins.fade / 120); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, CFG.W, CFG.H); ctx.globalAlpha = 1; }
+  if (state.ruins.fade) { ctx.globalAlpha = Math.min(1, state.ruins.fade / CFG.ruinsFade); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, CFG.W, CFG.H); ctx.globalAlpha = 1; }
+  // 暗転のあと、真ん中に FIN がゆっくり浮かぶ
+  if (state.ruins.fin) {
+    ctx.globalAlpha = Math.min(1, state.ruins.fin / 90);
+    text('FIN', CFG.W / 2, CFG.H / 2, 40, '#cfd6ff', 'center', '#000', RETRO_FONT);
+    ctx.globalAlpha = 1;
+  }
 }

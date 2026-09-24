@@ -4,9 +4,10 @@ import { CFG } from './config.js';
 import { state } from './world.js';
 import * as sched from './sched.js';
 import { STORY } from './text.js';
-import { BOSS_ARM_ROOT } from './sprites.js';
-import { explode, flash, debris, smoke, sendSignal, receiverXY } from './world.js';
+import { BOSS_ARM_ROOT, BOSS_WINDOW } from './sprites.js';
+import { explode, flash, debris, smoke, sendSignal, receiverXY, planetXY, PLANET_BG_SCALE } from './world.js';
 import { fxRng } from './rng.js';
+import { playSfx } from './sfx.js';
 
 const TYPE = 4;       // タイプライター：1文字あたりのフレーム
 const PART_GAP = 45;  // 繰り返す行の、次の繰り返しまでの間
@@ -16,7 +17,7 @@ const FADE = 30;
 // ---- 断片の1行表示（画面上部。戦いの邪魔をしない位置） ----
 // 表示中なら順番待ち（続けて割っても上書きしない）
 export function showLine(parts, opt = {}) {
-  const L = { parts, t: 0, y: opt.y ?? 96, size: opt.size ?? 22, type: opt.type ?? TYPE };
+  const L = { parts, t: 0, y: opt.y ?? 96, size: opt.size ?? 22, type: opt.type ?? TYPE, hold: opt.hold ?? HOLD };
   if (state.logLine && !opt.now) state.logQueue.push(L);
   else state.logLine = L;
 }
@@ -35,8 +36,8 @@ export function lineProgress(L) {
     if (i < L.parts.length - 1) { if (t < PART_GAP) { done = false; break; } t -= PART_GAP; }
   }
   const total = lineTotal(L);
-  const alpha = L.t < total + HOLD ? 1 : Math.max(0, 1 - (L.t - total - HOLD) / FADE);
-  return { text: shown.join('　'), alpha, done, over: L.t >= total + HOLD + FADE };
+  const alpha = L.t < total + L.hold ? 1 : Math.max(0, 1 - (L.t - total - L.hold) / FADE);
+  return { text: shown.join('　'), alpha, done, over: L.t >= total + L.hold + FADE };
 }
 
 export function moveStory() {
@@ -45,9 +46,23 @@ export function moveStory() {
     L.t++;
     // 次が待っていれば、出し切った時点で早めに切り上げる
     const pr = lineProgress(L);
+    // 1 文字出るたびにピッ（逆転裁判風）。空白は鳴らさない。「・」も1文字として鳴らす
+    const n = pr.text.replace(/[\s　]/g, '').length;
+    if (n > (L.typed ?? 0)) playSfx(L.type > TYPE ? 'typeSlow' : 'type');
+    L.typed = n;
     if (pr.over || (state.logQueue.length && pr.done && L.t > lineTotal(L) + 90)) state.logLine = state.logQueue.shift() ?? null;
   }
-  if (state.mission) { state.mission.t++; }
+  if (state.mission) {
+    const M = state.mission;
+    M.t++;
+    // 冒頭のミッションも 1 文字ごとにピッ。見えている文字数は render.js の表示と同じ式
+    const [h, body] = STORY.mission;
+    const shown = h.slice(0, Math.min(h.length, Math.floor(M.t / 4)))
+      + [...body].slice(0, Math.max(0, Math.floor((M.t - 30) / 5))).join('');
+    const n = shown.replace(/[\s　]/g, '').length;
+    if (n > (M.typed ?? 0)) playSfx('type');
+    M.typed = n;
+  }
 }
 
 // でか玉が割れたとき
@@ -111,7 +126,7 @@ export function* mission() {
   state.mission = null;
 }
 
-// ---- 撃破後：攻撃が止まる → 動きが止まる → 灯が、ひとつずつ消える → 静かになる → 一言 → 暗転 → 最後の一枚 ----
+// ---- 撃破後：攻撃が止まる → 羽が折れる → 2つの問い → 最後の信号とともに暗くなる → 最後の一枚 ----
 export const LIGHTS = 6;
 export function* afterBoss(b) {
   state.quiet = true;                        // 自機も撃たない。ずっと定型だった画面が、最後に黙る
@@ -121,6 +136,7 @@ export function* afterBoss(b) {
     const big = i % 5 === 4;
     const x = b.x + 20 + fxRng.range(-120, 120), y = b.y + fxRng.range(-120, 120);
     explode(x, y, big ? 90 + fxRng.rnd() * 40 : 40 + fxRng.rnd() * 40);
+    playSfx(big ? 'boom' : 'pop');
     debris(x, y, big ? 5 : 2);
     if (i % 3 === 2) flash('#fff', 5);
     yield* sched.wait(5 + ((fxRng.rnd() * 7) | 0));
@@ -128,45 +144,58 @@ export function* afterBoss(b) {
   // 2. 大爆発を2段
   yield* sched.wait(15);
   explode(b.x + 20, b.y, 200); debris(b.x + 20, b.y, 12); flash('#fff', 30); state.shake = 30;
+  playSfx('bigboom');
   yield* sched.wait(14);
   explode(b.x - 30, b.y + 20, 150); flash('#fff', 20);
+  playSfx('boom');
   b.burnt = true;
   // 3. おさまる（くすぶる）
   for (let i = 0; i < 5; i++) { smoke(b.x + 20 + fxRng.range(-60, 60), b.y + fxRng.range(-40, 40)); yield* sched.wait(20); }
-  // 4. ボキッ：下の羽はもげて回転しながら落ちる。上の羽はポロッと折れて、落ちそうなままぶら下がる
+  // 4. 付け根で小さな爆発が続く。下の羽はもげて落ち、上の羽は折れてぶら下がる
   for (const side of ['down', 'up']) {
     const [rx, ry] = BOSS_ARM_ROOT[side];
     const hang = side === 'up';
-    b.cracks = { ...(b.cracks || {}), [side]: 1 };
-    state.shake = 5;
-    yield* sched.wait(35);
+    const x = b.x + 20 + rx, y = b.y + ry;
+    // 亀裂の線の代わりに、付け根で 2 回爆発する（音も 2 回）→ 羽が落ちる／折れる
+    for (const [dx, dy, size, pause] of [[-10, -6, 16, 14], [6, 4, 22, 18]]) {
+      explode(x + dx, y + dy, size);
+      playSfx('pop');
+      yield* sched.wait(pause);
+    }
     b.arms = { ...(b.arms || {}), [side]: { t: 0, hang } };   // 付け根で曲がり始める（boss.js が動かす）
     yield* sched.wait(18);
-    if (hang) { explode(b.x + 20 + rx, b.y + ry, 35); debris(b.x + 20 + rx, b.y + ry, 2); state.shake = 10; }
-    else { explode(b.x + 20 + rx, b.y + ry, 70); debris(b.x + 20 + rx, b.y + ry, 6); flash('#fff', 8); state.shake = 22; }
-    yield* sched.wait(hang ? 70 : 50);
+    if (hang) { explode(x, y, 30); debris(x, y, 2); state.shake = 8; playSfx('snap'); }   // 折れる：ゴキッ
+    else { explode(x, y, 46); debris(x, y, 5); flash('#fff', 5); state.shake = 14; playSfx('boom'); }   // もげて落ちる：爆発音
+    // 下の羽が落ちたあと「あ、落ちちゃったんだな」と納得できる間（約2秒）を置いてから、上の羽へ
+    yield* sched.wait(hang ? 70 : 120);
   }
   b.drift = true;                            // 焼け残りがゆっくり左下へ漂い、惑星から離れていく
-  while (b.lights > 0) { b.lights--; yield* sched.wait(40); }
-  yield* sched.wait(90);                     // 静かになる
+  yield* sched.wait(90);                     // 爆発のあと、少し静かになる
   state.logQueue.length = 0;
   showLine([STORY.final], { y: CFG.H / 2 + 150, size: 24, now: true });
+  // 台詞の間は船体を明るく保つ。灯だけが一つずつ消える
+  while (b.lights > 0) { yield* sched.wait(40); b.lights--; }
   yield* sched.waitUntil(() => !state.logLine);
   yield* sched.wait(60);
   showLine([STORY.finalCall], { y: CFG.H / 2 + 150, size: 20, now: true, type: CFG.finalCallType });   // ゆっくり、途切れ途切れ
   yield* sched.waitUntil(() => !state.logLine || lineProgress(state.logLine).done);
   yield* sched.wait(40);
-  // 言い終えてから、最後の力で発信する：小さな灯がひとつ点滅して点く → 信号が惑星へ → 届いて、それきり
+  // 言い終えてから、青い窓が点滅して点く → そこから信号が惑星へ。船体は信号の間に暗くなる
+  b.finalDim = 0;
   b.beacon = { t: 0 };
   yield* sched.wait(60);
   const [tx, ty] = receiverXY();
-  const sig = sendSignal(b.x + 20, b.y - 50, tx, ty, 'last');
+  const sig = sendSignal(b.x + 20 + BOSS_WINDOW.x, b.y + BOSS_WINDOW.y, tx, ty, 'last');
   yield* sched.waitUntil(() => !sig.alive);
-  b.beacon = null;                           // 最後の灯も消える
-  yield* sched.wait(70);
-  state.blackout = { t: 0 };                 // 暗転
-  yield* sched.wait(90);
+  b.beacon.fadeT = 0;                        // 信号が消えたら、窓の光もゆっくり弱まる
+  yield* sched.wait(CFG.boss.beaconFade);
+  b.beacon = null;
+  yield* sched.wait(30);
+  // 暗転を挟まず、この瞬間の惑星と母船の位置のまま最後の一枚へ
+  { const [px, py] = planetXY(); state.endPlanet = { x: px, y: py, scale: PLANET_BG_SCALE * (state.planet ?? 1) }; }
+  state.endBoss = { x: b.x + 20, y: b.y };
+  state.endArms = { up: { ...b.arms.up }, down: { ...b.arms.down } };
+  state.endPlayer = { x: state.player.x, y: state.player.y };
   state.mode = 'ending';
   state.endT = 0;
-  state.blackout = null;                     // 最後の一枚は自分でフェードインする
 }
