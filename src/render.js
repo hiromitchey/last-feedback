@@ -607,9 +607,93 @@ function drawTouchUI() {
   }
 }
 
+// ---- タイトルロゴ：ドットのくっきりした立体文字（80年代アーケード風）----
+// ドット文字（DotGothic16）を本来の 16px で描いて半透明を切り落とし、整数倍に拡大して貼る（ドットが崩れない）。
+// FEEDBACK：奥行き（紺）→ 縁（水色）→ 本体（白→水色のグラデーション＋下半分に走査線）を4倍に。
+// その上に小さく LAST（2倍）と、FEEDBACK の右端まで伸びる信号の点線。ときどき信号が乱れるように横にずれる
+const LOGO_BIG = 5, LOGO_SMALL = 3;
+let logo = null, logoLoading = false;
+function glyphMask(str, spacing = 0) {
+  const size = 16, c = document.createElement('canvas'), g = c.getContext('2d');
+  g.font = `${size}px ${RETRO_FONT}`;
+  const ws = [...str].map(ch => Math.round(g.measureText(ch).width));
+  c.width = ws.reduce((a, b) => a + b, 0) + spacing * (str.length - 1) + 2; c.height = size + 4;
+  g.font = `${size}px ${RETRO_FONT}`; g.textBaseline = 'top'; g.fillStyle = '#fff';
+  let x = 1;
+  [...str].forEach((ch, i) => { g.fillText(ch, x, 2); x += ws[i] + spacing; });
+  const im = g.getImageData(0, 0, c.width, c.height), d = im.data;
+  for (let i = 3; i < d.length; i += 4) d[i] = d[i] > 110 ? 255 : 0;   // 半透明を切り落とす
+  g.putImageData(im, 0, 0);
+  return c;
+}
+function tinted(mask, paint) {
+  const c = document.createElement('canvas'); c.width = mask.width; c.height = mask.height;
+  const g = c.getContext('2d');
+  g.drawImage(mask, 0, 0);
+  g.globalCompositeOperation = 'source-atop';           // 文字のドットの上にだけ塗る（重ね塗りしても形が消えない）
+  paint(g, c.width, c.height);
+  return c;
+}
+// 奥行き・縁・本体を重ねた1つの文字列（1ドット単位）
+function block(mask, fill, edge, depthCol, depth) {
+  const pad = depth + 1;
+  const c = document.createElement('canvas'); c.width = mask.width + pad * 2; c.height = mask.height + pad * 2;
+  const g = c.getContext('2d');
+  const deep = tinted(mask, (t, w, h) => { t.fillStyle = depthCol; t.fillRect(0, 0, w, h); });
+  const rim = tinted(mask, (t, w, h) => { t.fillStyle = edge; t.fillRect(0, 0, w, h); });
+  for (let i = depth; i >= 1; i--) g.drawImage(deep, pad + i, pad + i);
+  for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) g.drawImage(rim, pad + dx, pad + dy);
+  g.drawImage(tinted(mask, fill), pad, pad);
+  return c;
+}
+function buildLogo() {
+  const big = block(glyphMask('FEEDBACK', 1), (t, w, h) => {
+    const gr = t.createLinearGradient(0, 0, 0, h);
+    gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.55, '#ffffff'); gr.addColorStop(0.56, '#9fe8ff'); gr.addColorStop(1, '#5bbde8');
+    t.fillStyle = gr; t.fillRect(0, 0, w, h);
+    t.fillStyle = '#3a9fd4';                                  // 下半分に走査線（クロームの照り返し）
+    for (let y = Math.round(h * 0.62); y < h; y += 2) t.fillRect(0, y, w, 1);
+  }, '#1d6fa3', '#0b1f3d', 2);
+  const small = block(glyphMask('LAST', 3), (t, w, h) => { t.fillStyle = '#9fe8ff'; t.fillRect(0, 0, w, h); }, '#1d4f7a', '#0b1f3d', 1);
+  return { big, small };
+}
+function drawLogo(cx, cy) {
+  if (!logo) {
+    if (!logoLoading && document.fonts) {
+      logoLoading = true;
+      document.fonts.load(`16px ${RETRO_FONT}`).then(() => { logo = buildLogo(); }).catch(() => { logo = buildLogo(); });
+    }
+    text('LAST FEEDBACK', cx, cy, 72, '#ffffff', 'center', '#3f93c2');   // 読み込み中だけ
+    return;
+  }
+  const { big, small } = logo;
+  const bw = big.width * LOGO_BIG, bh = big.height * LOGO_BIG;
+  const sw = small.width * LOGO_SMALL, sh = small.height * LOGO_SMALL;
+  const x0 = Math.round(cx - bw / 2), top = Math.round(cy - (bh + sh) / 2), by = top + sh - LOGO_SMALL * 2;
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  // LAST と、FEEDBACK の右端まで伸びる信号の点線
+  ctx.drawImage(small, x0 + LOGO_BIG, top, sw, sh);
+  const ly = top + Math.round(sh / 2), lx0 = x0 + sw + 12, lx1 = x0 + bw - 8;
+  for (let x = lx0; x < lx1; x += 8) { ctx.fillStyle = '#0b1f3d'; ctx.fillRect(x + 2, ly + 2, 4, 2); ctx.fillStyle = '#9fe8ff'; ctx.fillRect(x, ly, 4, 2); }
+  // 点線の上を、光の粒がひとつ流れていく（惑星へ飛ぶ信号）
+  const p = (state.frame % 150) / 150;
+  ctx.globalAlpha = Math.sin(Math.PI * p); ctx.fillStyle = '#ffffff';
+  ctx.fillRect(Math.round(lx0 + p * (lx1 - lx0)), ly - 2, 8, 6);
+  ctx.globalAlpha = 1;
+  // FEEDBACK。ときどき、信号が乱れるように横にずれる（フィードバックのノイズ）
+  const f = state.frame % 300;
+  if (f < 8) {
+    for (let sy = 0; sy < big.height; sy += 2) {
+      const off = ((sy * 7 + f * 13) % 5 === 0) ? ((sy + f) % 2 ? 3 : -3) * LOGO_BIG : 0;
+      ctx.drawImage(big, 0, sy, big.width, 2, x0 + off, by + sy * LOGO_BIG, bw, 2 * LOGO_BIG);
+    }
+  } else ctx.drawImage(big, x0, by, bw, bh);
+  ctx.restore();
+}
+
 function drawTitle() {
-  // 白に水色の縁取り（惑星へ飛ぶ信号と同じ系統）
-  text('LAST FEEDBACK', CFG.W / 2, CFG.H / 2 - 50, 72, '#ffffff', 'center', '#3f93c2');
+  drawLogo(CFG.W / 2, CFG.H / 2 - 62);
   if ((state.frame >> 5) & 1)
     text('クリック / タップ / Z ではじめる', CFG.W / 2, CFG.H / 2 + 40, 22, '#FFD54F');
   const help = [
