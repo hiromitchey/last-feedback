@@ -610,7 +610,7 @@ function drawTouchUI() {
 // ---- タイトルロゴ：ドットのくっきりした立体文字（80年代アーケード風）----
 // ドット文字（DotGothic16）を本来の 16px で描いて半透明を切り落とし、整数倍に拡大して貼る（ドットが崩れない）。
 // FEEDBACK：奥行き（紺）→ 縁（水色）→ 本体（白→水色のグラデーション＋下半分に走査線）を4倍に。
-// その上に小さく LAST（2倍）と、FEEDBACK の右端まで伸びる信号の点線。ときどき信号が乱れるように横にずれる
+// その上に小さく LAST。ときどき乱れるように横にずれる
 const LOGO_BIG = 5, LOGO_SMALL = 3;
 let logo = null, logoLoading = false;
 function glyphMask(str, spacing = 0) {
@@ -672,15 +672,8 @@ function drawLogo(cx, cy) {
   const x0 = Math.round(cx - bw / 2), top = Math.round(cy - (bh + sh) / 2), by = top + sh - LOGO_SMALL * 2;
   ctx.save();
   ctx.imageSmoothingEnabled = false;
-  // LAST と、FEEDBACK の右端まで伸びる信号の点線
+  // LAST（信号の線は付けない：物語の先回りになる、とユーザー）
   ctx.drawImage(small, x0 + LOGO_BIG, top, sw, sh);
-  const ly = top + Math.round(sh / 2), lx0 = x0 + sw + 12, lx1 = x0 + bw - 8;
-  for (let x = lx0; x < lx1; x += 8) { ctx.fillStyle = '#0b1f3d'; ctx.fillRect(x + 2, ly + 2, 4, 2); ctx.fillStyle = '#9fe8ff'; ctx.fillRect(x, ly, 4, 2); }
-  // 点線の上を、光の粒がひとつ流れていく（惑星へ飛ぶ信号）
-  const p = (state.frame % 150) / 150;
-  ctx.globalAlpha = Math.sin(Math.PI * p); ctx.fillStyle = '#ffffff';
-  ctx.fillRect(Math.round(lx0 + p * (lx1 - lx0)), ly - 2, 8, 6);
-  ctx.globalAlpha = 1;
   // FEEDBACK。ときどき、信号が乱れるように横にずれる（フィードバックのノイズ）
   const f = state.frame % 300;
   if (f < 8) {
