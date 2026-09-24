@@ -1,5 +1,8 @@
 // 全数値をここに集約する（技術設計書 1章）。調整はこのファイルだけを触る
-export const DEBUG = true;
+// 開発用の機能（場面ジャンプ・F キー・__pop など）。手元（localhost）で開いたときだけ有効。
+// 公開ページでも使いたいときは URL に ?debug を付ける
+export const DEBUG = typeof location !== 'undefined'
+  && (['localhost', '127.0.0.1'].includes(location.hostname) || new URLSearchParams(location.search).has('debug'));
 
 export const CFG = {
   W: 960, H: 540, FPS: 60, STEP: 1000 / 60,
