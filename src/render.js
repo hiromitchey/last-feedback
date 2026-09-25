@@ -23,12 +23,18 @@ export function initRender(canvas) {
   ctx = cv.getContext('2d');
   fit();
   addEventListener('resize', fit);
+  // 画面の向きが変わった直後は大きさがまだ古いことがあるので、少し待ってからもう一度合わせる
+  matchMedia('(orientation: portrait) and (pointer: coarse)').addEventListener?.('change', () => { fit(); setTimeout(fit, 300); });
+  addEventListener('orientationchange', () => setTimeout(fit, 300));
   buildBackground();
 }
 
 // 画面フィット。canvas の実ピクセルだけ dpr 倍し、論理座標は変えない
+// スマホが縦のままなら、ゲームを90度回して出す（index.html の CSS と同じ条件）
+export const turned = () => matchMedia('(orientation: portrait) and (pointer: coarse)').matches;
 export function fit() {
-  const s = Math.min(innerWidth / CFG.W, innerHeight / CFG.H);
+  const vw = innerWidth, vh = innerHeight;
+  const s = turned() ? Math.min(vh / CFG.W, vw / CFG.H) : Math.min(vw / CFG.W, vh / CFG.H);
   const dpr = Math.min(devicePixelRatio || 1, 2);
   cv.style.width = Math.floor(CFG.W * s) + 'px';
   cv.style.height = Math.floor(CFG.H * s) + 'px';

@@ -34,9 +34,21 @@ const roles = new Map();  // pointerId -> 'move' | 'shot' | 'bomb' | 'pause' | '
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
+// ゲームを90度回して出しているとき（スマホが縦のまま）は、画面の縦がゲームの横になる
+const turned = () => matchMedia('(orientation: portrait) and (pointer: coarse)').matches;
 function toLogical(e) {
   const r = cv.getBoundingClientRect();
+  if (turned()) return { x: (e.clientY - r.top) / r.height * CFG.W, y: (r.right - e.clientX) / r.width * CFG.H };
   return { x: (e.clientX - r.left) / r.width * CFG.W, y: (e.clientY - r.top) / r.height * CFG.H };
+}
+// スマホで最初に触ったとき、全画面にして横向きに固定してみる（Android の Chrome など。できなければ何もしない）
+let triedLock = false;
+function tryLandscape() {
+  if (triedLock) return;
+  triedLock = true;
+  const el = document.documentElement;
+  if (!el.requestFullscreen || !screen.orientation?.lock) return;
+  el.requestFullscreen({ navigationUI: 'hide' }).then(() => screen.orientation.lock('landscape')).catch(() => {});
 }
 
 function hitButton(p) {
@@ -72,6 +84,7 @@ export function initInput(canvas) {
     }
     // タッチ・ペン：触れた瞬間に役割を決めて、離すまで変えない
     input.touchUsed = true;
+    if (e.pointerType === 'touch') tryLandscape();
     const role = hitButton(p) || 'move';
     roles.set(e.pointerId, role);
     try { cv.setPointerCapture(e.pointerId); } catch {}

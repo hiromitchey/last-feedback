@@ -44,12 +44,8 @@
     background: #202f45;
   }
   #sfx-pick { margin-bottom: 6px; }
-  #rotate {
-    display: none; position: fixed; inset: 0; background: #0b0b12; color: #fff;
-    font: 22px/1.6 "DotGothic16", monospace;
-    align-items: center; justify-content: center; text-align: center;
-  }
-  @media (orientation: portrait) and (pointer: coarse) { #rotate { display: flex; } }
+  /* スマホが縦のまま（自動回転オフなど）のときは、ゲームごと90度回して出す。スマホを横に持てばそのまま遊べる */
+  @media (orientation: portrait) and (pointer: coarse) { #game { transform: rotate(90deg); } }
 </style>
 </head>
 <body>
@@ -83,7 +79,6 @@
     </div>
   </details>
 </div>
-<div id="rotate">📱↻<br>横にしてください</div>
 <script type="module" src="./src/main.js"></script>
 </body>
 </html>
