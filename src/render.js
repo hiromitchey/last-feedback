@@ -104,6 +104,22 @@ function blit(img, x, y, rot = 0, scale = 1) {
   ctx.restore();
 }
 
+// フォント（PixelMplus12）に無い記号はドット絵で描く。# が塗り。まわりを1ドット縁取る
+const ICONS = {
+  heart: ['.##.##.', '#######', '#######', '.#####.', '..###..', '...#...'],
+  left: ['....#', '...##', '..###', '.####', '#####', '.####', '..###', '...##', '....#'],
+};
+function icon(name, cx, cy, px, col, outline = '#2a2140') {
+  const rows = ICONS[name], h = rows.length, w = rows[0].length;
+  const x0 = Math.round(cx - w * px / 2), y0 = Math.round(cy - h * px / 2);
+  const on = (x, y) => y >= 0 && y < h && x >= 0 && x < w && rows[y][x] === '#';
+  ctx.fillStyle = outline;
+  for (let y = -1; y <= h; y++) for (let x = -1; x <= w; x++)
+    if (!on(x, y) && (on(x - 1, y) || on(x + 1, y) || on(x, y - 1) || on(x, y + 1))) ctx.fillRect(x0 + x * px, y0 + y * px, px, px);
+  ctx.fillStyle = col;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (on(x, y)) ctx.fillRect(x0 + x * px, y0 + y * px, px, px);
+}
+
 function text(str, x, y, size, col, align = 'center', outline = '#2a2140', font = null) {
   ctx.font = `${size}px ${font || RETRO_FONT}`;
   ctx.textAlign = align; ctx.textBaseline = 'middle';
@@ -207,10 +223,10 @@ export function render(debug) {
   for (const b of state.pBullets) blit(shot, b.x, b.y, b.ang);
   // 自機 + 判定円（常に最前面）
   drawPlayer();
-  // 出現予告「▶」（右端。何にも隠されない）
+  // 出現予告「◀」（右端。何にも隠されない）
   for (const w of state.warnings) {
     if ((w.t >> 2) & 1) continue;
-    text('◀', CFG.W - 22, w.y, 26, '#FFD54F');
+    icon('left', CFG.W - 22, w.y, 3, '#FFD54F');
   }
   drawPopups();
   drawStoryText();
@@ -553,8 +569,7 @@ function drawHUD() {
   // レトロSTGのUIに擬態させる：左上に 047（物語）
   text('047', 22, 24, 18, '#fff', 'left');
   text('SCORE ' + String(Math.floor(state.score)).padStart(7, '0'), 110, 24, 18, '#fff', 'left');
-  const hearts = p.lives >= 0 ? '♥'.repeat(Math.min(p.lives, 9)) : '';
-  text(hearts, 330, 24, 16, COL.PINK, 'left');
+  for (let i = 0; i < Math.min(Math.max(p.lives, 0), 9); i++) icon('heart', 338 + i * 18, 24, 2, COL.PINK);   // 残機のハート
   // ワイド（W）とパワー（P）の段階。四角は次の段階までに拾った数
   const row = (label, kind, col, gy, sub) => {
     const gx = 22, lv = p.lv[kind];
@@ -614,21 +629,29 @@ function drawTouchUI() {
 }
 
 // ---- タイトルロゴ：ドットのくっきりした立体文字（80年代アーケード風）----
-// ドット文字（DotGothic16）を本来の 16px で描いて半透明を切り落とし、整数倍に拡大して貼る（ドットが崩れない）。
+// ドット文字（PixelMplus12）を本来の 12px で描いて半透明を切り落とし、整数倍に拡大して貼る（ドットが崩れない）。
+// 英字は全角で描く（半角は幅6ドットで細すぎる）
 // FEEDBACK：奥行き（紺）→ 縁（水色）→ 本体（白→水色のグラデーション＋下半分に走査線）を4倍に。
 // その上に小さく LAST。ときどき乱れるように横にずれる
-const LOGO_BIG = 5, LOGO_SMALL = 3;
+const LOGO_BIG = 6, LOGO_SMALL = 4;
 let logo = null, logoLoading = false;
-function glyphMask(str, spacing = 0) {
-  const size = 16, c = document.createElement('canvas'), g = c.getContext('2d');
+function glyphMask(str, spacing = 0, bold = false) {
+  const size = 12, c = document.createElement('canvas'), g = c.getContext('2d');
   g.font = `${size}px ${RETRO_FONT}`;
   const ws = [...str].map(ch => Math.round(g.measureText(ch).width));
-  c.width = ws.reduce((a, b) => a + b, 0) + spacing * (str.length - 1) + 2; c.height = size + 4;
+  c.width = ws.reduce((a, b) => a + b, 0) + spacing * (str.length - 1) + 3; c.height = size + 4;
   g.font = `${size}px ${RETRO_FONT}`; g.textBaseline = 'top'; g.fillStyle = '#fff';
   let x = 1;
   [...str].forEach((ch, i) => { g.fillText(ch, x, 2); x += ws[i] + spacing; });
   const im = g.getImageData(0, 0, c.width, c.height), d = im.data;
   for (let i = 3; i < d.length; i += 4) d[i] = d[i] > 110 ? 255 : 0;   // 半透明を切り落とす
+  if (bold) {                                   // 右に1ドット太らせる（線が1ドットだとロゴとして弱い）
+    const src = d.slice();
+    for (let y = 0; y < c.height; y++) for (let x = 1; x < c.width; x++) {
+      const k = (y * c.width + x) * 4 + 3;
+      if (src[k - 4]) d[k] = 255;
+    }
+  }
   g.putImageData(im, 0, 0);
   return c;
 }
@@ -653,21 +676,21 @@ function block(mask, fill, edge, depthCol, depth) {
   return c;
 }
 function buildLogo() {
-  const big = block(glyphMask('FEEDBACK', 1), (t, w, h) => {
+  const big = block(glyphMask('ＦＥＥＤＢＡＣＫ', -2, true), (t, w, h) => {
     const gr = t.createLinearGradient(0, 0, 0, h);
     gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.55, '#ffffff'); gr.addColorStop(0.56, '#9fe8ff'); gr.addColorStop(1, '#5bbde8');
     t.fillStyle = gr; t.fillRect(0, 0, w, h);
     t.fillStyle = '#3a9fd4';                                  // 下半分に走査線（クロームの照り返し）
     for (let y = Math.round(h * 0.62); y < h; y += 2) t.fillRect(0, y, w, 1);
   }, '#1d6fa3', '#0b1f3d', 2);
-  const small = block(glyphMask('LAST', 3), (t, w, h) => { t.fillStyle = '#9fe8ff'; t.fillRect(0, 0, w, h); }, '#1d4f7a', '#0b1f3d', 1);
+  const small = block(glyphMask('ＬＡＳＴ', -1, true), (t, w, h) => { t.fillStyle = '#9fe8ff'; t.fillRect(0, 0, w, h); }, '#1d4f7a', '#0b1f3d', 1);
   return { big, small };
 }
 function drawLogo(cx, cy) {
   if (!logo) {
     if (!logoLoading && document.fonts) {
       logoLoading = true;
-      document.fonts.load(`16px ${RETRO_FONT}`).then(() => { logo = buildLogo(); }).catch(() => { logo = buildLogo(); });
+      document.fonts.load(`12px ${RETRO_FONT}`, 'ＦＥＥＤＢＡＣＫ').then(() => { logo = buildLogo(); }).catch(() => { logo = buildLogo(); });
     }
     text('LAST FEEDBACK', cx, cy, 72, '#ffffff', 'center', '#3f93c2');   // 読み込み中だけ
     return;

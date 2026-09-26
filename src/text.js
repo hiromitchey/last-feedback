@@ -141,4 +141,4 @@ export const STORY = {
 };
 
 // レトロなドット風フォント（Google Fonts / OFL）。読めなければ等幅で代用
-export const RETRO_FONT = '"DotGothic16", "MS Gothic", "Osaka-Mono", monospace';
+export const RETRO_FONT = '"PixelMplus12", "MS Gothic", "Osaka-Mono", monospace';   // fonts/ に同梱（M+ FONT LICENSE）

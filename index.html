@@ -4,11 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>LAST FEEDBACK</title>
-<!-- 文字の弾用のドット風フォント（OFL）。配布時はビルドで埋め込む -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<!-- 画面の文字はすべてドット風フォント PixelMplus12（M+ FONT LICENSE。fonts/ に同梱、ライセンスも同じ場所） -->
+<link rel="preload" href="./fonts/PixelMplus12-Regular.ttf" as="font" type="font/ttf" crossorigin>
 <style>
+  @font-face {
+    font-family: "PixelMplus12";
+    src: url("./fonts/PixelMplus12-Regular.ttf") format("truetype");
+    font-display: swap;
+  }
   html, body { height: 100%; }
   body {
     margin: 0; background: #0b0b12; overflow: hidden;
@@ -21,7 +24,7 @@
   canvas { display: block; touch-action: none; }
   #volume-control {
     position: absolute; top: 48px; right: 10px; z-index: 2;
-    color: #cfd6ff; font: 14px/1.5 "DotGothic16", monospace;
+    color: #cfd6ff; font: 12px/1.5 "PixelMplus12", monospace;
   }
   #volume-control summary {
     display: block; cursor: pointer; list-style: none; text-align: center;

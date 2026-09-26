@@ -476,7 +476,7 @@ export function glyphSprite(ch, col, px = GLYPH_SIZE, invert = false) {
 
 export function watchFont() {
   if (!document.fonts?.load) return;
-  document.fonts.load(`${GLYPH_SIZE}px "DotGothic16"`, 'アイ').then(() => {
+  document.fonts.load(`${GLYPH_SIZE}px ${RETRO_FONT}`, 'アイ').then(() => {
     // 文字を含む絵（声の文字・アイテムの W/P/B）を作り直す
     for (const k of [...cache.keys()]) if (k.startsWith('g|') || k.startsWith('i|')) cache.delete(k);
   }).catch(() => {});
